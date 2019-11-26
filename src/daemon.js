@@ -1,3 +1,5 @@
+const {resolve} = require('path');
+
 const {MongoClient} = require('mongodb');
 
 const Agenda = require('agenda');
@@ -24,7 +26,7 @@ module.exports = class {
         this.options.db.collections.store = this.options.db.collections.store || 'Store';
         this.options.tasks = this.options.tasks || [];
         this.options.plugins = this.options.plugins || {};
-        this.options.plugins.paths = this.options.plugins.paths || [];
+        this.options.plugins.paths = (this.options.plugins.paths || []).map(p => p === 'built-in' ? resolve(__dirname, 'plugins') : p);
         this.options.plugins.defaults = this.options.plugins.defaults || {};
         this.options.plugins.config = this.options.plugins.config || {};
         this.options.daemon = this.options.daemon || {};
