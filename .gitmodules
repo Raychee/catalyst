@@ -1,0 +1,3 @@
+[submodule "lib/agenda"]
+	path = lib/agenda
+	url = https://github.com/hellohupu/agenda.git

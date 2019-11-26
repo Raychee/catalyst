@@ -1,0 +1,44 @@
+{
+  "name": "@raychee/catalyst",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Raychee/catalyst.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Raychee/catalyst/issues"
+  },
+  "homepage": "https://github.com/Raychee/catalyst#readme",
+  "dependencies": {
+    "agenda": "file:./lib/agenda",
+    "apollo-cache-inmemory": "^1.6.2",
+    "apollo-client": "^2.6.3",
+    "apollo-link": "^1.2.12",
+    "apollo-link-context": "^1.0.18",
+    "apollo-link-error": "^1.1.11",
+    "apollo-link-http": "^1.5.15",
+    "apollo-link-persisted-queries": "^0.2.2",
+    "apollo-link-retry": "^2.2.15",
+    "apollo-server-koa": "^2.7.0",
+    "dataloader": "^1.4.0",
+    "graphql": "^14.4.2",
+    "graphql-augment": "^0.3.29",
+    "graphql-tag": "latest",
+    "graphql-type-json": "^0.3.0",
+    "json-stable-stringify": "^1.0.1",
+    "koa": "^2.7.0",
+    "lodash": "^4.17.15",
+    "mongodb": "^3.2.7",
+    "node-fetch": "^2.6.0",
+    "puppeteer-core": "^1.15.0",
+    "request": "^2.88.0",
+    "request-promise-native": "^1.0.7",
+    "tough-cookie": "^3.0.1",
+    "uuid": "^3.3.2"
+  }
+}
