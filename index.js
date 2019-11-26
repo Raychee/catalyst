@@ -1,7 +1,7 @@
-const server = require('./src/server');
-const daemon = require('./src/daemon');
+const Server = require('./src/server');
+const Daemon = require('./src/daemon');
 
 module.exports = {
-    server,
-    daemon,
+    Server,
+    Daemon,
 };
