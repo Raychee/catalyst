@@ -10,6 +10,10 @@ class Logger {
         this.transform = transform;
     }
 
+    debug(...values) {
+        this._log(console.log, `${this.category ? `${this.category} ` : ''}Debug`, ...values);
+    }
+
     info(...values) {
         this._log(console.log, `${this.category ? `${this.category} ` : ''}Info`, ...values);
     }

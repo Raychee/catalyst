@@ -57,6 +57,11 @@ type TaskDomainConfig { # @auth(query: ["B:q","TaskDomainConfig:q"], upsert: ["B
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    """
+    任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
+    重复任务实例指的是同一个类型、参数完全相同的任务实例。
+    """
+    dedupRecent: Boolean @query @upsert
     "修改时间"
     mtime: DateTime @query
 }
@@ -86,6 +91,11 @@ type TaskTypeConfig { # @auth(query: ["B:q", "TaskTypeConfig:q"], upsert: ["B:u"
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    """
+    任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
+    重复任务实例指的是同一个类型、参数完全相同的任务实例。
+    """
+    dedupRecent: Boolean @query @upsert
     """
     子任务调度参数的默认配置。
     当该任务类型的执行逻辑包含分发其它类型的子任务时，指定子任务的延迟时间、重试次数等。
@@ -129,6 +139,11 @@ type Task {
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
     # @auth(query: ["A:q", "Task:dedupWithin:q"], result: ["A:r", "Task:dedupWithin:r"])
+    """
+    任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
+    重复任务实例指的是同一个类型、参数完全相同的任务实例。
+    """
+    dedupRecent: Boolean @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
     delay: Float @query @upsert
     # @auth(query: ["A:q", "Task:delay:q"], result: ["A:r", "Task:delay:r"])
@@ -217,6 +232,11 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
     # @auth(query: ["Job:dedupWithin:q"], result: ["Job:dedupWithin:r"])
+    """
+    任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
+    重复任务实例指的是同一个类型、参数完全相同的任务实例。
+    """
+    dedupRecent: Boolean @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
     delay: Float @query
     # @auth(query: ["Job:delay:q"], result: ["Job:delay:r"])

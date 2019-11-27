@@ -12,7 +12,6 @@ const {InMemoryCache} = require('apollo-cache-inmemory');
 const fetch = require('node-fetch');
 const {get} = require('lodash');
 
-const {API_HOST, API_PORT} = require('../config');
 const {dedup} = require('../utils');
 
 
@@ -199,22 +198,10 @@ function makeReturnExpr(projections) {
 
 
 module.exports = {
-    key(
-        {
-            uri = `http://${API_HOST}:${API_PORT}/query`,
-            id = 'crawler', password = process.env.KCARD_API_AUTH_CRAWLER_PASSWORD,
-            httpOptions = {fetchOptions: {timeout: 60000}},
-        } = {}
-    ) {
-        return {uri, id, password, httpOptions};
+    key(options = {}) {
+        return options;
     },
-    async create(
-        {
-            uri = `http://${API_HOST}:${API_PORT}/query`,
-            id = 'crawler', password = process.env.KCARD_API_AUTH_CRAWLER_PASSWORD,
-            httpOptions = {fetchOptions: {timeout: 60000}},
-        } = {}
-    ) {
+    async create({uri, id, password, httpOptions} = {}) {
         const client = new DataClient(this, uri, id, password, httpOptions);
         await client._connect();
         return client;

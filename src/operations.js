@@ -6,7 +6,9 @@ const {DEFAULT_TASK_DOMAIN_CONFIG, TYPES} = require('./config');
 const {safeJSON, deepEqual, shrink, diff, stringify, sleep} = require('./utils');
 
 
-const SCHEDULING_PROPERTIES = ['delay', 'delayRandomize', 'retry', 'retryDelayFactor', 'priority', 'dedupWithin'];
+const SCHEDULING_PROPERTIES = [
+    'delay', 'delayRandomize', 'retry', 'retryDelayFactor', 'priority', 'dedupWithin', 'dedupRecent'
+];
 
 
 class Operations {
@@ -320,36 +322,37 @@ class Operations {
     }
 
     async findDuplicate({domain, type, params, dedupWithin, timeCreated = new Date()}) {
-        if (dedupWithin > 0) {
-            const dupQuery = {
-                domain, type, timeCreated: {$gte: new Date(timeCreated - dedupWithin * 1000)},
-                status: {$in: ['PENDING', 'RUNNING', 'DELAYED', 'SUCCESS']}
-            };
-            const dupQueryParams = [];
-            const task = await this.taskLoader.get([domain, type]);
-            let dedup = task.dedup ? task.dedup({...params}) : params;
-            if (!Array.isArray(dedup)) dedup = [dedup];
-            for (const d of dedup) {
-                const dp = {};
-                for (const [p, v] of Object.entries(d)) {
-                    dp[`params.${p}`] = v;
-                }
-                dupQueryParams.push(dp);
+        if (dedupWithin <= 0) {
+            return;
+        }
+        const dupQuery = {
+            domain, type, timeCreated: {$gte: new Date(timeCreated - dedupWithin * 1000)},
+            status: {$in: ['PENDING', 'RUNNING', 'DELAYED', 'SUCCESS']}
+        };
+        const dupQueryParams = [];
+        const task = await this.taskLoader.get([domain, type]);
+        let dedup = task.dedup ? task.dedup({...params}) : params;
+        if (!Array.isArray(dedup)) dedup = [dedup];
+        for (const d of dedup) {
+            const dp = {};
+            for (const [p, v] of Object.entries(d)) {
+                dp[`params.${p}`] = v;
             }
-            if (dupQueryParams.length > 1) {
-                dupQuery.$or = dupQueryParams;
-            } else if (dupQueryParams.length === 1) {
-                Object.assign(dupQuery, dupQueryParams[0]);
-            }
-            if (task.dedup) {
-                const [dup] = await this.query('Job', dupQuery, {limit: 1});
-                return dup;
-            } else {
-                const possibleDups = await this.query('Job', dupQuery);
-                for (const dup of possibleDups) {
-                    if (deepEqual(dedup, dup.dedup)) {
-                        return dup;
-                    }
+            dupQueryParams.push(dp);
+        }
+        if (dupQueryParams.length > 1) {
+            dupQuery.$or = dupQueryParams;
+        } else if (dupQueryParams.length === 1) {
+            Object.assign(dupQuery, dupQueryParams[0]);
+        }
+        if (task.dedup) {
+            const [dup] = await this.query('Job', dupQuery, {limit: 1});
+            return dup;
+        } else {
+            const possibleDups = await this.query('Job', dupQuery);
+            for (const dup of possibleDups) {
+                if (deepEqual(dedup, dup.dedup)) {
+                    return dup;
                 }
             }
         }
@@ -390,7 +393,7 @@ class Operations {
             job.timeCreated = new Date();
             job.trials = [];
             const dup = await this.findDuplicate(job);
-            if (dup) {
+            if (dup && job.dedupRecent) {
                 const {domain, type, params} = job;
                 console.log(`Info - Job scheduling is skipped as a duplicate of job ${dup.id}: ${JSON.stringify({domain, type, params})}`);
             } else {
@@ -400,6 +403,16 @@ class Operations {
                 agendaJob.schedule(new Date());
                 agendaJob.priority(job.priority);
                 await agendaJob.save();
+                if (dup) {
+                    const upserted = await this.upsert(
+                        'Job', {id: dup.id, status: 'CANCELED'}, true, undefined,
+                        {status: {$nin: ['SUCCESS', 'FAILED']}}
+                    );
+                    if (upserted) {
+                        const {domain, type, params} = upserted;
+                        console.log(`Info - Job ${dup.id} is canceled as a duplicate of the new job ${job.id}: ${JSON.stringify({domain, type, params})}`);
+                    }
+                }
                 return job;
             }
         }

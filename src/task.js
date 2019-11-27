@@ -339,6 +339,10 @@ class Job {
         this._logger.fail(code, ...values);
     }
 
+    debug(...values) {
+        this._logger.debug(...values);
+    }
+
     info(...values) {
         this._logger.info(...values);
     }

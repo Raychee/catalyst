@@ -11,6 +11,7 @@ const DEFAULT_TASK_DOMAIN_CONFIG = {
     retryDelayFactor: 2,
     priority: 0,
     dedupWithin: 0,
+    dedupRecent: true,
 };
 
 const TYPES = {
