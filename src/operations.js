@@ -453,9 +453,6 @@ class Operations {
             case 'keys':
                 return await dataloader.loadMany(q);
             case 'query':
-                if (false && process.env.KCARD_RUNTIME_STAGE === 'local') {
-                    console.log(`Debug - mongodb.find(${JSON.stringify(q)})`);
-                }
                 let cursor = this.mongodb.collection(typeName).find(q);
                 const {sort, limit, offset} = options || {};
                 if (sort) {

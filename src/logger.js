@@ -4,6 +4,14 @@ const {CrawlerError, CrawlerIntentionalCrash, CrawlerCancellation, CrawlerInterr
 const {ensureThunkSync, sleep, dedup, flatten, stringifyWith} = require('./utils');
 
 
+const LOGGING_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+};
+
+
 class Logger {
 
     constructor(category, prefixes = [], transform) {
@@ -13,21 +21,29 @@ class Logger {
     }
 
     debug(...values) {
-        this._log(console.log, `${this.category ? `${this.category} ` : ''}Debug`, ...values);
+        if (this._level() <= LOGGING_LEVELS.DEBUG) {
+            this._log(console.log, `${this.category ? `${this.category} ` : ''}Debug`, ...values);
+        }
     }
 
     info(...values) {
-        this._log(console.log, `${this.category ? `${this.category} ` : ''}Info`, ...values);
+        if (this._level() <= LOGGING_LEVELS.INFO) {
+            this._log(console.log, `${this.category ? `${this.category} ` : ''}Info`, ...values);
+        }
     }
 
     warn(...values) {
-        this._log(console.error, `${this.category ? `${this.category} ` : ''}Warn`, ...values);
+        if (this._level() <= LOGGING_LEVELS.WARN) {
+            this._log(console.error, `${this.category ? `${this.category} ` : ''}Warn`, ...values);
+        }
     }
 
     error(...values) {
-        this._log(console.error, `${this.category ? `${this.category} ` : ''}Error`, ...values);
-        if (values.length === 1 && values[0] instanceof Error) {
-            console.error(values[0]);
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.error, `${this.category ? `${this.category} ` : ''}Error`, ...values);
+            if (values.length === 1 && values[0] instanceof Error) {
+                console.error(values[0]);
+            }
         }
     }
 
@@ -53,45 +69,70 @@ class Logger {
         log(`${timestamp}${logCategory} - ${stringifyWith(prefixes, {transform: this.transform, delimiter: ' - '})} - ${stringifyWith(values, {transform: this.transform})}`);
     }
 
+    _level() {
+        return LOGGING_LEVELS[this.LOGGING_LEVEL];
+    }
+
 }
+
+
+Logger.prototype.LOGGING_LEVEL = 'INFO';
 
 
 class JobLogger extends Logger {
 
     delay(...values) {
-        this._log(console.log, 'Delay', ...values);
+        if (this._level() <= LOGGING_LEVELS.INFO) {
+            this._log(console.log, 'Delay', ...values);
+        }
     }
 
     retry(...values) {
-        this._log(console.log, 'Retry', ...values);
+        if (this._level() <= LOGGING_LEVELS.INFO) {
+            this._log(console.log, 'Retry', ...values);
+        }
     }
 
     start(...values) {
-        this._log(console.log, 'Start', ...values);
+        if (this._level() <= LOGGING_LEVELS.INFO) {
+            this._log(console.log, 'Start', ...values);
+        }
     }
 
     complete(...values) {
-        this._log(console.log, 'Complete', ...values);
+        if (this._level() <= LOGGING_LEVELS.INFO) {
+            this._log(console.log, 'Complete', ...values);
+        }
     }
 
     cancel(...values) {
-        this._log(console.error, 'Cancel', ...values);
+        if (this._level() <= LOGGING_LEVELS.INFO) {
+            this._log(console.error, 'Cancel', ...values);
+        }
     }
 
     fail(...values) {
-        this._log(console.error, 'Fail', ...values);
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.error, 'Fail', ...values);
+        }
     }
 
     crash(...values) {
-        this._log(console.error, 'Crash', ...values);
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.error, 'Crash', ...values);
+        }
     }
 
     catch(...values) {
-        this._log(console.log, 'Catch', ...values);
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.log, 'Catch', ...values);
+        }
     }
 
     interrupt(...values) {
-        this._log(console.error, 'Interrupt', ...values);
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.error, 'Interrupt', ...values);
+        }
     }
 
 }
