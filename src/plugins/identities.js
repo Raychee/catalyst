@@ -10,8 +10,9 @@ class Identities {
         this.logger = logger;
         this.name = name;
         this.stored = stored;
+        this.identities = {};
         if (!stored) {
-            this._load({config: options});
+            this._load({options});
         }
 
         this._init = dedup(Identities.prototype._init.bind(this));
@@ -25,48 +26,44 @@ class Identities {
                 this.logger.crash(
                     '_identities_crash', 'invalid identities name: ', this.name, ', please make sure: ',
                     '1. there is a document in the internal table service.Store that matches filter {plugin: \'identities\'}, ',
-                    '2. there is a valid identities config entry under document field \'data.', this.name, '\''
+                    '2. there is a valid identities options entry under document field \'data.', this.name, '\''
                 );
             }
             this._load(store);
         }
     }
 
-    _load(store, {configOnly = false} = {}) {
+    _load({options = {}, identities = {}}) {
         const minIntervalBetweenStoreUpdate = get(this.options, 'minIntervalBetweenStoreUpdate');
         // {
         //     createIdentityFn,
         //     maxDeprecationsBeforeRemoval = 3, minIntervalBetweenUse = 5, recentlyUsedFirst = false,
         //     minIntervalBetweenStoreUpdate = 10, lockExpire = 10 * 60,
         // } = options;
-        const {config, identities = []} = store;
-        this.options = this._makeOptions(config);
+        this.options = this._makeOptions(options);
         if (minIntervalBetweenStoreUpdate !== this.options.minIntervalBetweenStoreUpdate) {
-            this._syncStore = dedup(
-                Identities.prototype._syncStore.bind(this),
+            this.__syncStore = dedup(
+                Identities.prototype.__syncStore.bind(this),
                 {within: this.options.minIntervalBetweenStoreUpdate * 1000}
             );
         }
-        if (!configOnly) {
-            this.identities = identities;
-            for (const identity of identities) {
-                identity.locked = undefined;
-            }
+        for (const identity of this._iterIdentities(identities)) {
+            delete identity.locked;
+            this._add(identity);
         }
     }
 
-    add(_, {id = uuid4(), data, deprecated = 0, lastTimeUsed = new Date(0), locked = undefined}) {
-        const identity = {id, data, deprecated, lastTimeUsed, locked};
-        this.identities.push(identity);
-        this._syncStore();
-        return identity;
+    _add({id = uuid4(), data, deprecated = 0, lastTimeUsed = new Date(0), locked = false}) {
+        const identity = {data, deprecated, lastTimeUsed, locked};
+        this.identities[id] = {...identity, ...this.identities[id]};
+        return {id, ...identity};
     }
 
     async get(logger, {ifAbsent = undefined, waitForStore = false, lock = false} = {}) {
         logger = logger || this.logger;
         while (true) {
             let identity = undefined;
-            for (const i of this.identities) {
+            for (const i of this._iterIdentities()) {
                 if (!this._isAvailable(i)) continue;
                 if (!identity) {
                     identity = i;
@@ -99,32 +96,38 @@ class Identities {
         if (createIdentityFn) {
             identity = await createIdentityFn();
             if (identity) {
-                identity = this.add(logger, identity);
+                identity = this._add(identity);
             }
         }
         if (!identity && waitForStore && this.stored) {
             const store = await this.logger.pull({
-                waitUntil: s => get(s, [this.name, 'identities'], []).some(i => this._isAvailable(i)),
+                waitUntil: s => {
+                    const identities = get(s, [this.name, 'identities'], {});
+                    for (const identity of this._iterIdentities(identities)) {
+                        if (this._isAvailable(identity)) return true;
+                    }
+                    return false;
+                },
                 message: `waiting for a valid identity in store field ${this.name}`
             });
-            this.identities = store[this.name].identities;
+            this._load(store[this.name]);
         }
     }
 
     lock(logger, one) {
-        const {identity} = this._find(one);
+        const {id, identity} = this._find(one);
         if (!identity) return;
-        this._info(logger, identity.id, ' is locked.');
+        this._info(logger, id, ' is locked.');
         identity.locked = new Date();
     }
 
     unlock(logger, one) {
-        const {identity} = this._find(one);
+        const {id, identity} = this._find(one);
         if (!identity) return;
         if (identity.locked) {
-            this._info(logger, identity.id, ' is unlocked.');
+            this._info(logger, id, ' is unlocked.');
             identity.locked = undefined;
-            this.touch(logger, identity);
+            this.touch(logger, id);
         }
     }
 
@@ -136,69 +139,81 @@ class Identities {
     }
 
     update(_, id, data) {
-        const {identity} = this._find(id);
+        const {id, identity} = this._find(one);
         if (!identity) return;
         identity.data = data;
         this._syncStore();
     }
 
     renew(logger, one) {
-        const {identity} = this._find(one);
+        const {id, identity} = this._find(one);
         if (!identity) return;
         if (identity.deprecated > 0) {
-            this._info(logger, identity.id, ' is renewed.');
+            this._info(logger, id, ' is renewed.');
             identity.deprecated = 0;
             this._syncStore();
         }
     }
 
     deprecate(logger, one) {
-        const {identity} = this._find(one);
+        const {id, identity} = this._find(one);
         if (!identity) return;
         identity.deprecated = (identity.deprecated || 0) + 1;
-        this._info(logger,
-            identity.id, ' is deprecated (', identity.deprecated, '/',
+        this._info(
+            logger, id, ' is deprecated (', identity.deprecated, '/',
             this.options.maxDeprecationsBeforeRemoval, ').'
         );
         if (identity.deprecated >= this.options.maxDeprecationsBeforeRemoval) {
-            this.remove(logger, identity);
+            this.remove(logger, id);
         }
-        this.unlock(logger, identity);
+        this.unlock(logger, id);
         this._syncStore();
     }
 
     remove(logger, one) {
-        const {index} = this._find(one);
-        if (index >= 0) {
-            const [removed] = this.identities.splice(index, 1);
-            this._info(logger, removed.id, ' is removed: ', removed);
-            this._syncStore();
+        const {id, identity} = this._find(one);
+        if (!identity) return;
+        this.identities[id] = null;
+        this._info(logger, id, ' is removed: ', identity);
+        this._syncStore();
+    }
+
+    *_iterIdentities(identities) {
+        for (const [id, identity] of Object.entries(identities || this.identities)) {
+            if (!identity) continue;
+            yield {id, ...identity};
         }
     }
 
-    _find(identity) {
-        let index = -1;
-        if (typeof identity === "string") {
-            index = this.identities.findIndex(i => i.id === identity);
-        } else {
-            index = this.identities.indexOf(identity);
-            if (index < 0) {
-                index = this.identities.findIndex(i => i.id === identity.id);
-            }
-        }
-        identity = index >= 0 ? this.identities[index] : undefined;
-        return {identity, index};
+    _id(one) {
+        return typeof one === "string" ? one : one.id;
     }
 
-    async _syncStore() {
+    _find(one) {
+        const id = this._id(one);
+        return {id, identity: this.identities[id]};
+    }
+
+    async __syncStore() {
+        let deleteNullIdentities = true;
         if (this.stored) {
             try {
                 const store = await this.logger.push({[this.name]: {identities: this.identities}});
-                this._load(get(store, this.name), {configOnly: true});
+                this._load(store[this.name]);
             } catch (e) {
+                deleteNullIdentities = false;
                 this._warn(undefined, 'Sync identities of name ', this.name, ' failed: ', e);
             }
         }
+        if (deleteNullIdentities) {
+            Object.entries(this.identities)
+                .filter(([, i]) => !i)
+                .forEach(([id]) => delete this.identities[id]);
+        }
+    }
+
+    _syncStore() {
+        this.__syncStore().catch(e => console.error('This should never happen: ', e));
     }
 
     _isAvailable(identity) {
@@ -209,9 +224,10 @@ class Identities {
 
     _makeOptions(options) {
         return {
+            createIdentityFn: (this.options || {}).createIdentityFn,
             maxDeprecationsBeforeRemoval: 3, minIntervalBetweenUse: 5, minIntervalBetweenStoreUpdate: 10,
             recentlyUsedFirst: false, lockExpire: 10 * 60,
-            ...options
+            ...options,
         };
     }
 

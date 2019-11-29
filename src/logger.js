@@ -1,3 +1,5 @@
+const {isEmpty} = require('lodash');
+
 const {CrawlerError, CrawlerIntentionalCrash, CrawlerCancellation, CrawlerInterruption} = require('./error');
 const {ensureThunkSync, sleep, dedup, flatten, stringifyWith} = require('./utils');
 
@@ -114,8 +116,18 @@ class StoreLogger extends Logger {
             );
         } else {
             const updates = flatten(store, {prefix: 'data'});
+            const unsets = {};
+            Object.entries(updates)
+                .filter(([, v]) => v === null)
+                .forEach(([p]) => {
+                    delete updates[p];
+                    unsets[p] = '';
+                });
+            const operation = {};
+            if (!isEmpty(updates)) operation.$set = updates;
+            if (!isEmpty(unsets)) operation.$unset = unsets;
             result = await this.storeCollection.findOneAndUpdate(
-                this.identity, {$set: updates}, {upsert: true, returnOriginal: false}
+                this.identity, operation, {upsert: true, returnOriginal: false}
             );
         }
         return result.value.data || {};

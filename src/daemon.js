@@ -5,6 +5,7 @@ const {MongoClient} = require('mongodb');
 const Agenda = require('agenda');
 
 const {INDEXES} = require('./config');
+const {Logger} = require('./logger');
 const {TaskLoader, PluginLoader} = require('./loader');
 const {JobContextCache} = require('./task');
 const Operations = require('./operations');
@@ -31,9 +32,13 @@ module.exports = class {
         this.options.plugins.config = this.options.plugins.config || {};
         this.options.daemon = this.options.daemon || {};
         this.options.daemon.waitBeforeStop = this.options.daemon.waitBeforeStop || 0;
+        this.options.logging = this.options.logging || {};
+        this.options.logging.level = this.options.logging.level || 'INFO';
 
         this.taskLoader = undefined;
         this.mongodb = undefined;
+
+        Logger.prototype.LOGGING_LEVEL = this.options.logging.level;
     }
 
     async start() {

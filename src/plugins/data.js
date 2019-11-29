@@ -10,7 +10,7 @@ const {RetryLink} = require('apollo-link-retry');
 const {createPersistedQueryLink} = require('apollo-link-persisted-queries');
 const {InMemoryCache} = require('apollo-cache-inmemory');
 const fetch = require('node-fetch');
-const {get} = require('lodash');
+const {get, isEmpty} = require('lodash');
 
 const {dedup} = require('../utils');
 
@@ -97,7 +97,7 @@ class DataClient {
                 defaultProjections = {results: defaultProjections};
             }
             this[`query${field.name}`] = async (logger, variables, projections) => {
-                if (!projections || Object.keys(projections).length <= 0) projections = defaultProjections;
+                if (!projections || isEmpty(projections)) projections = defaultProjections;
                 try {
                     const resp = await this.apolloClient.query({
                         query: gql`query (${queryArgDeclare}) { ${field.name} (${queryArgs}) ${makeReturnExpr(projections) } }`,
@@ -126,7 +126,7 @@ class DataClient {
                 defaultProjections = {results: defaultProjections};
             }
             this[`${field.name[0].toLowerCase()}${field.name.slice(1)}`] = async (logger, variables, projections) => {
-                if (!projections || Object.keys(projections).length <= 0) projections = defaultProjections;
+                if (!projections || isEmpty(projections)) projections = defaultProjections;
                 try {
                     const resp = await this.apolloClient.mutate({
                         mutation: gql`mutation (${queryArgDeclare}) { ${field.name} (${queryArgs}) ${makeReturnExpr(projections)} }`,

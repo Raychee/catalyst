@@ -3,7 +3,7 @@ const path = require('path');
 const readline = require('readline');
 const {promisify} = require('util');
 
-const {get, isObjectLike, isPlainObject} = require('lodash');
+const {get, isObjectLike, isPlainObject, isEmpty} = require('lodash');
 const {ObjectId} = require('mongodb');
 const stableStringify = require('json-stable-stringify');
 const request = require('request-promise-native');
@@ -108,7 +108,7 @@ function deepEqual(a, b) {
         return true;
     }
     if (typeof a === 'object' && typeof b === 'object' && a.constructor === Object && b.constructor === Object) {
-        return Object.keys(diff(a, b)).length <= 0;
+        return isEmpty(diff(a, b));
     }
     if (a instanceof Date && b instanceof Date && a.getTime() === b.getTime()) return true;
     if (a instanceof ObjectId && b instanceof ObjectId && a.equals(b)) return true;

@@ -46,10 +46,10 @@ function defaultLoadIdentityFn(options, {cookies, userAgent}) {
     }
 }
 
-function defaultValidateIdentityFn(options, {identity, proxy, response, error}) {
+function defaultValidateIdentityFn() {
 }
 
-function defaultValidateProxyFn(options, {identity, proxy, response, error}) {
+function defaultValidateProxyFn(options, {response, error}) {
     if (error) return error;
     if (response && (response.statusCode < 200 || response.statusCode >= 400)) return response;
 }
@@ -227,7 +227,7 @@ module.exports = {
                     try {
                         trial++;
                         response = await req(logger, options);
-                        logger.info('request(', options, ') ', proxy || 'no proxy', ' / ', identity && identity.id || 'no identity', ' -> resp');
+                        // logger.info('request(', options, ') ', proxy || 'no proxy', ' / ', identity && identity.id || 'no identity', ' -> resp');
                     } catch (e) {
                         error = e;
                         response = error.response;
@@ -235,13 +235,17 @@ module.exports = {
                         if (!resolveWithFullResponse) {
                             response = response && response.body;
                         }
-                        logger.info('request(', options, ') -> error');
+                        // logger.info('request(', options, ') -> error');
                     }
                     if (proxy) {
-                        proxyInvalidMessage = await validateProxyFn.call(logger, options, {identity, proxy, response, error});
+                        proxyInvalidMessage = await validateProxyFn.call(
+                            logger, options, {identities, identityId: (identity || {}).id, identity: (identity || {}).data, proxies, proxy, response, error}
+                        );
                     }
                     if (identity) {
-                        identityInvalidMessage = await validateIdentityFn.call(logger, options, {identity, proxy, response, error});
+                        identityInvalidMessage = await validateIdentityFn.call(
+                            logger, options, {identities, identityId: identity.id, identity: identity.data, proxies, proxy, response, error}
+                        );
                     }
 
                     if (proxyInvalidMessage || identityInvalidMessage) {
@@ -262,7 +266,7 @@ module.exports = {
                         } else {
                             logger.warn(
                                 'Request failed with ', proxy || 'no proxy', ' / ', identity && identity.id || 'no identity',
-                                'and too many rotations have been tried (',
+                                ' and too many rotations have been tried (',
                                 maxRetryIdentities, '/', maxRetryIdentities, '): ', ...logMessages
                             );
                         }

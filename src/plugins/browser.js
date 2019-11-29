@@ -374,7 +374,10 @@ class Browser {
                     }
                     if (this.currentProxy) {
                         result.proxyInvalid = await this.validateProxyFn.call(logger, page, method, {
+                            identities: this.identities,
+                            identityId: this.currentIdentity && this.currentIdentity.id,
                             identity: this.currentIdentity && this.currentIdentity.data,
+                            proxies: this.proxies,
                             proxy: this.currentProxy,
                             args, returned, error
                         });
@@ -382,7 +385,10 @@ class Browser {
                     }
                     if (this.currentIdentity) {
                         result.identityInvalid = await this.validateIdentityFn.call(logger, page, method, {
-                            identity: this.currentIdentity && this.currentIdentity.data,
+                            identities: this.identities,
+                            identityId: this.currentIdentity.id,
+                            identity: this.currentIdentity.data,
+                            proxies: this.proxies,
                             proxy: this.currentProxy,
                             args, returned, error
                         });
@@ -536,9 +542,9 @@ class Browser {
         }
     }
 
-    validateIdentityFn(page, method, {identity, proxy, args, returned, error}) {}
+    validateIdentityFn() {}
 
-    validateProxyFn(page, method, {identity, proxy, args, returned, error}) {
+    validateProxyFn(page, method, {returned, error}) {
         if (error) return error;
         if (method === 'goto') {
             if (returned && !returned.ok()) return `${returned.status()} (${returned.statusText()})`;

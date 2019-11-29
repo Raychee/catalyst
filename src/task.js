@@ -1,9 +1,11 @@
+const {isEmpty} = require('lodash');
 const {UserInputError} = require('apollo-server-koa');
+const {diff} = require('deep-object-diff');
 const uuid = require('uuid/v4');
 
 const {JOB_DELAY_CHECK_INTERVAL, JOB_MIN_CHECK_INTERVAL} = require('./config');
 const {Logger, JobLogger, StoreLogger} = require('./logger');
-const {sleep, safeJSON, random, ensureThunkCall, errorToString, merge2Level, dedup, diff} = require('./utils');
+const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, dedup} = require('./utils');
 const {
     CrawlerError,
     CrawlerCancellation,
@@ -23,14 +25,18 @@ class TaskDomain {
         this.storeCollection = storeCollection;
     }
 
-    async load({config, plugins, store, dedup}) {
+    async load({config, plugins, store, validate, dedup, catch: catch_, failed, final}) {
         const logger = new StoreLogger(this.storeCollection, {domain: this.name}, 'Domain', [this.name]);
         this.config = {domain: this.name, ...await ensureThunkCall(config, logger)};
         if (this.pluginLoader) {
             this.plugins = merge2Level(this.pluginLoader && this.pluginLoader.defaultPlugins, await ensureThunkCall(plugins, logger, this.config));
             this.store = await ensureThunkCall(store, logger, this.config, await this.plugins, {pluginLoader: this.pluginLoader}) || {};
         }
+        this.validate = validate || (() => {});
         this.dedup = dedup;
+        this.catch = catch_ || (() => false);
+        this.failed = failed || (() => {});
+        this.final = final || (() => {});
     }
 
 }
@@ -55,12 +61,12 @@ class TaskType {
             this.plugins = merge2Level(this.domain.plugins, await ensureThunkCall(plugins, logger, this.config));
             this.store = {...this.domain.store, ...await ensureThunkCall(store, logger, this.config, this.plugins, {pluginLoader: this.pluginLoader})};
         }
-        this.validate = validate || (() => {});
+        this.validate = validate || this.domain.validate;
         this.dedup = dedup || this.domain.dedup;
-        this.run = run || (() => {});
-        this.catch = catch_ || (() => false);
-        this.failed = failed || (() => {});
-        this.final = final || (() => {});
+        this.run = run || this.domain.run;
+        this.catch = catch_ || this.domain.catch;
+        this.failed = failed || this.domain.failed;
+        this.final = final || this.domain.final;
     }
 
     get key() {
@@ -86,6 +92,7 @@ class TaskType {
                      trialCounter <= (job.config.retry || 0);
                      trialCounter++) {
 
+                    await job._load();
                     try {
                         if (trialCounter === 0) {
                             // this job is triggered by Operations.scheduleJob(),
@@ -113,7 +120,6 @@ class TaskType {
                                 return;
                             }
                             await job._update(updates);
-                            await job._load();
                         } else {
                             job.config.context = {...job.config.context};
                             job.config.trials.push({});
@@ -183,9 +189,9 @@ class TaskType {
                                 }
                             }
                         } else {
-                            let catchMessage;
+                            let catchMessages;
                             try {
-                                catchMessage = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
+                                catchMessages = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
                             } catch (ee) {
                                 if (ee instanceof CrawlerInterruption) {
                                     throw ee;
@@ -198,11 +204,14 @@ class TaskType {
                                 }
                                 throw ee;
                             }
-                            if (catchMessage) {
-                                job._loggerSys.catch('Job fails by catching: ', e);
+                            if (catchMessages) {
+                                if (!Array.isArray(catchMessages)) {
+                                    catchMessages = [catchMessages];
+                                }
+                                job._loggerSys.catch('Job fails by catching: ', ...catchMessages);
                                 if (job.config.id) {
                                     await job._updateTrial({
-                                        status: 'FAILED', code: e.code || '_catch', message: `${catchMessage}: ${errorToString(e)}`,
+                                        status: 'FAILED', code: e.code || '_catch', message: stringifyWith(catchMessages),
                                     }, true);
                                 }
                             } else {
@@ -235,8 +244,6 @@ class TaskType {
                                 //     };
                                 // }
 
-                                await job._unload();
-
                             } catch (e) {
                                 if (e instanceof CrawlerInterruption) {
                                     throw e;
@@ -250,6 +257,7 @@ class TaskType {
                                 throw e;
                             }
                         }
+                        await job._unload();
                     }
                 }
             }
@@ -446,7 +454,7 @@ class Job {
         if (contextUpdate) {
             const safeContext = safeJSON(contextUpdate);
             const contextDiff = diff(safeContext, contextUpdate);
-            if (Object.keys(contextDiff).length > 0) {
+            if (!isEmpty(contextDiff)) {
                 for (const [p, v] of Object.entries(contextDiff)) {
                     this._loggerSys.warn(`"${p}" in context is not serializable, so its persistence is skipped: ${v}`);
                 }
@@ -500,7 +508,7 @@ class Job {
             this.cancel('_cancel_disabled', 'Job cancels because the task is disabled.');
         }
         const diff = await this._taskType.operations.populateJobSchedulingProperties(this.config, task, undefined, true);
-        if (Object.keys(diff).length > 0) {
+        if (!isEmpty(diff)) {
             await this._update(diff);
         }
     }

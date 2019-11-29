@@ -10,6 +10,7 @@ const {config, makeSchemaDirectives} = require('graphql-augment');
 
 const Agenda = require('agenda');
 
+const {Logger} = require('./logger');
 const {TaskLoader} = require('./loader');
 const Operations = require('./operations');
 const resolvers = require('./service/resolvers');
@@ -35,9 +36,13 @@ module.exports = class {
         this.options.tasks = this.options.tasks || [];
         this.options.api = this.options.api || {};
         this.options.api.secret = this.options.api.secret || '';
+        this.options.logging = this.options.logging || {};
+        this.options.logging.level = this.options.logging.level || 'INFO';
 
         this.server = undefined;
         this.mongodb = undefined;
+
+        Logger.prototype.LOGGING_LEVEL = this.options.logging.level;
     }
 
     async start() {

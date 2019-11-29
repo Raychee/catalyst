@@ -1,4 +1,4 @@
-const _ = require('lodash');
+const {set, get, isEmpty} = require('lodash');
 const DataLoader = require('dataloader');
 const {UserInputError} = require('apollo-server-koa');
 
@@ -201,12 +201,12 @@ class Operations {
     mergeSubTaskConfigs(one, override) {
         const subTasks = {};
         for (const subTaskConfig of one || []) {
-            _.set(subTasks, getKeyValues('TaskTypeConfig', subTaskConfig), subTaskConfig);
+            set(subTasks, getKeyValues('TaskTypeConfig', subTaskConfig), subTaskConfig);
         }
         for (const subTaskConfig of override || []) {
             const taskTypeKey = getKeyValues('TaskTypeConfig', subTaskConfig);
-            const fullSubTaskConfig = {..._.get(subTasks, taskTypeKey), ...subTaskConfig};
-            _.set(subTasks, taskTypeKey, fullSubTaskConfig);
+            const fullSubTaskConfig = {...get(subTasks, taskTypeKey), ...subTaskConfig};
+            set(subTasks, taskTypeKey, fullSubTaskConfig);
         }
         return Object.values(subTasks).flatMap(s => Object.values(s));
     }
@@ -421,10 +421,10 @@ class Operations {
     // for those whose key is undefined (e.g. Config which is globally unique),
     // just assign "q" with a random scalar value, like 1. and you will get the one object.
     async query(typeName, q, options, dataloaders, count) {
-        let dataloader = _.get(dataloaders, typeName);
+        let dataloader = get(dataloaders, typeName);
         if (!dataloader) {
             dataloader = this._newDataLoader(typeName);
-            _.set(dataloaders, typeName, dataloader);
+            set(dataloaders, typeName, dataloader);
         }
         const key = TYPES[typeName].key;
         if (isQueryBy(q) === 'query') {
@@ -500,7 +500,7 @@ class Operations {
         } else {
             doc = await this._update(typeName, doc, filter || {}, rawChange, !filter, waitForFilter);
         }
-        let dataloader = _.get(dataloaders, typeName);
+        let dataloader = get(dataloaders, typeName);
         if (dataloader) {
             const k = key ? getKeyValues(typeName, doc) : 1;
             dataloader.prime(k, doc);
@@ -516,7 +516,7 @@ class Operations {
             const current = await this.getTaskDomainConfig(domainKey, dataloaders);
             if (stored) {
                 const configDiff = diff(stored._full, current);
-                if (Object.keys(configDiff).length > 0) {
+                if (!isEmpty(configDiff)) {
                     console.log(`Refresh config for task domain "${domainKey.join('.')}".`);
                     // const updates = {...makeQuery('TaskDomainConfig', domainKey), ...configDiff};
                     await this.updateTaskDomainConfig(stored, {}, dataloaders);
@@ -544,7 +544,7 @@ class Operations {
             const current = await this.getTaskTypeConfig(taskType, stored, taskDomainConfig, dataloaders);
             if (stored) {
                 const configDiff = diff(stored._full, current);
-                if (Object.keys(configDiff).length > 0) {
+                if (isEmpty(configDiff)) {
                     console.log(`Refresh config for task type "${taskTypeKey.join('.')}".`);
                     // const updates = {...makeQuery('TaskTypeConfig', taskTypeKey), ...configDiff};
                     await this.updateTaskTypeConfig(taskType, undefined, {}, dataloaders);
@@ -567,7 +567,7 @@ class Operations {
             const task = await cursor.next();
             const fullTask = await this.getTask(task, taskTypeConfig, dataloaders);
             const taskDiff = diff(task._full, fullTask);
-            if (Object.keys(taskDiff).length > 0) {
+            if (isEmpty(taskDiff)) {
                 const taskKey = getKeyValues('Task', task);
                 setKeyValues('Task', taskDiff, taskKey);
                 promises.push(this.scheduleTask({id: task.id}));
