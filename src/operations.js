@@ -641,9 +641,6 @@ class Operations {
                 update.$setOnInsert = {[ctime]: now};
             }
         }
-        if (false && process.env.KCARD_RUNTIME_STAGE === 'local') {
-            console.log(`Debug - mongodb.collection(${JSON.stringify(typeName)}).findOneAndUpdate(${JSON.stringify(query)}, ${JSON.stringify(update)}, ${JSON.stringify({upsert: true, returnOriginal: false})})`);
-        }
         while (true) {
             const result = await this.mongodb.collection(typeName).findOneAndUpdate(
                 query, update, {upsert, returnOriginal: false}
@@ -670,9 +667,6 @@ class Operations {
                 doc[ctime] = now;
             }
         }
-        if (false && process.env.KCARD_RUNTIME_STAGE === 'local') {
-            console.log(`Debug - mongodb.collection(${JSON.stringify(typeName)}).insertOne(${JSON.stringify(doc)})`);
-        }
         const result = await this.mongodb.collection(typeName).insertOne(doc);
         if (key) {
             const set = {};
@@ -688,9 +682,6 @@ class Operations {
         const key = TYPES[typeName].key;
         if (key) {
             return new DataLoader(async ids => {
-                if (false && process.env.KCARD_RUNTIME_STAGE === 'local') {
-                    console.log(`Debug - mongodb.collection(${JSON.stringify(typeName)}).find(${JSON.stringify({$or: ids.map(i => makeQuery(typeName, i))})})`);
-                }
                 const results = await this.mongodb.collection(typeName).find({
                     $or: ids.map(i => makeQuery(typeName, i))
                 }).toArray();
@@ -703,9 +694,6 @@ class Operations {
             });
         } else {
             return new DataLoader(async ids => {
-                if (false && process.env.KCARD_RUNTIME_STAGE === 'local') {
-                    console.log(`Debug - mongodb.collection(${JSON.stringify(typeName)}).findOne()`);
-                }
                 const result = await this.mongodb.collection(typeName).findOne();
                 shrink(result);
                 return ids.map(() => result);

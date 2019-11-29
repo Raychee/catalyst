@@ -117,13 +117,7 @@ class Browser {
             // args = [...args, '--remote-debugging-port=9222', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--window-size=1280,1024'];
             // this.browser = await puppeteer.launch({args, ...connectOpts});
 
-            const defaultBrowserWSEndpoint = process.env.KCARD_RUNTIME_STAGE === 'local' ?
-                `ws://www.catatech.cn:3000?token=${process.env.KCARD_CRAWLER_BROWSERLESS_TOKEN}` :
-                `ws://crawler-browserless:3000?token=${process.env.KCARD_CRAWLER_BROWSERLESS_TOKEN}`;
-            let {
-                args = [], blockAds = true, ignoreDefaultArgs,
-                browserWSEndpoint = defaultBrowserWSEndpoint, ...connectOpts
-            } = this.connectOpts;
+            let {args = [], blockAds = true, ignoreDefaultArgs, browserWSEndpoint, ...connectOpts} = this.connectOpts;
             if (this.currentProxy) {
                 args = [...args, `--proxy-server=http://${this.currentProxy}`];
             }

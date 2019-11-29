@@ -65,7 +65,7 @@ class Logger {
 
     _log(log, logCategory, ...values) {
         const prefixes = ensureThunkSync(this.prefixes);
-        const timestamp = process.env.KCARD_RUNTIME_STAGE === 'local' ? `${new Date().toLocaleString()} - ` : '';
+        const timestamp = this.SHOW_TIMESTAMP ? `${new Date().toLocaleString()} - ` : '';
         log(`${timestamp}${logCategory} - ${stringifyWith(prefixes, {transform: this.transform, delimiter: ' - '})} - ${stringifyWith(values, {transform: this.transform})}`);
     }
 
@@ -77,6 +77,7 @@ class Logger {
 
 
 Logger.prototype.LOGGING_LEVEL = 'INFO';
+Logger.prototype.SHOW_TIMESTAMP = false;
 
 
 class JobLogger extends Logger {

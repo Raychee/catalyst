@@ -34,11 +34,13 @@ module.exports = class {
         this.options.daemon.waitBeforeStop = this.options.daemon.waitBeforeStop || 0;
         this.options.logging = this.options.logging || {};
         this.options.logging.level = this.options.logging.level || 'INFO';
+        this.options.logging.showTimestamp = this.options.logging.showTimestamp || false;
 
         this.taskLoader = undefined;
         this.mongodb = undefined;
 
         Logger.prototype.LOGGING_LEVEL = this.options.logging.level;
+        Logger.prototype.SHOW_TIMESTAMP = this.options.logging.showTimestamp;
     }
 
     async start() {
