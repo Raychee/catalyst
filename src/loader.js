@@ -3,9 +3,9 @@ const path = require('path');
 const {get, setWith} = require('lodash');
 const stableStringify = require('json-stable-stringify');
 
+const {walk, limit, dedup, sleep, ensureThunkSync} = require('@raychee/utils');
 const {TaskDomain, TaskType} = require('./task');
 const {StoreLogger} = require('./logger');
-const {walk, limit, dedup, sleep, ensureThunkSync} = require('./utils');
 
 
 class TaskLoader {

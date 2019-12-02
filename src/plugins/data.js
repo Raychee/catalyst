@@ -12,7 +12,7 @@ const {InMemoryCache} = require('apollo-cache-inmemory');
 const fetch = require('node-fetch');
 const {get, isEmpty} = require('lodash');
 
-const {dedup} = require('../utils');
+const {dedup} = require('@raychee/utils');
 
 
 class DataClient {

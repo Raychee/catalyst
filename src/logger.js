@@ -1,7 +1,7 @@
 const {isEmpty} = require('lodash');
 
+const {ensureThunkSync, sleep, dedup, flatten, stringifyWith} = require('@raychee/utils');
 const {CrawlerError, CrawlerIntentionalCrash, CrawlerCancellation, CrawlerInterruption} = require('./error');
-const {ensureThunkSync, sleep, dedup, flatten, stringifyWith} = require('./utils');
 
 
 const LOGGING_LEVELS = {

@@ -1,6 +1,6 @@
 const {get} = require('lodash');
 
-const {sleep, dedup, limit, requestWithTimeout} = require('../utils');
+const {sleep, dedup, limit, requestWithTimeout} = require('@raychee/utils');
 
 
 class Proxies {

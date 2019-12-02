@@ -2,8 +2,8 @@ const {set, get, isEmpty} = require('lodash');
 const DataLoader = require('dataloader');
 const {UserInputError} = require('apollo-server-koa');
 
+const {safeJSON, deepEqual, shrink, diff, stringify, sleep} = require('@raychee/utils');
 const {DEFAULT_TASK_DOMAIN_CONFIG, TYPES} = require('./config');
-const {safeJSON, deepEqual, shrink, diff, stringify, sleep} = require('./utils');
 
 
 const SCHEDULING_PROPERTIES = [
@@ -541,7 +541,7 @@ class Operations {
             const current = await this.getTaskTypeConfig(taskType, stored, taskDomainConfig, dataloaders);
             if (stored) {
                 const configDiff = diff(stored._full, current);
-                if (isEmpty(configDiff)) {
+                if (!isEmpty(configDiff)) {
                     console.log(`Refresh config for task type "${taskTypeKey.join('.')}".`);
                     // const updates = {...makeQuery('TaskTypeConfig', taskTypeKey), ...configDiff};
                     await this.updateTaskTypeConfig(taskType, undefined, {}, dataloaders);
@@ -564,7 +564,7 @@ class Operations {
             const task = await cursor.next();
             const fullTask = await this.getTask(task, taskTypeConfig, dataloaders);
             const taskDiff = diff(task._full, fullTask);
-            if (isEmpty(taskDiff)) {
+            if (!isEmpty(taskDiff)) {
                 const taskKey = getKeyValues('Task', task);
                 setKeyValues('Task', taskDiff, taskKey);
                 promises.push(this.scheduleTask({id: task.id}));

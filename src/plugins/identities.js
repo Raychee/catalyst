@@ -1,7 +1,7 @@
 const {get} = require('lodash');
 const uuid4 = require('uuid/v4');
 
-const {dedup} = require('../utils');
+const {dedup} = require('@raychee/utils');
 
 
 class Identities {

@@ -2,7 +2,7 @@ const request = require('request-promise-native');
 const uuid4 = require('uuid/v4');
 const {memoize, cloneDeep} = require('lodash');
 
-const {dedup, requestWithTimeout} = require('../utils');
+const {dedup, requestWithTimeout} = require('@raychee/utils');
 
 
 /**

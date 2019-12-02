@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer-core');
 const uuid4 = require('uuid/v4');
 
-const {dedup, retry} = require('../utils');
+const {dedup, retry} = require('@raychee/utils');
 
 
 class Browser {

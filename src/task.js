@@ -3,9 +3,9 @@ const {UserInputError} = require('apollo-server-koa');
 const {diff} = require('deep-object-diff');
 const uuid = require('uuid/v4');
 
+const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, dedup} = require('@raychee/utils');
 const {JOB_DELAY_CHECK_INTERVAL, JOB_MIN_CHECK_INTERVAL} = require('./config');
 const {Logger, JobLogger, StoreLogger} = require('./logger');
-const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, dedup} = require('./utils');
 const {
     CrawlerError,
     CrawlerCancellation,

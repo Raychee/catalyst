@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -15,6 +15,7 @@
   },
   "homepage": "https://github.com/Raychee/catalyst#readme",
   "dependencies": {
+    "@raychee/utils": "^0.1.0",
     "agenda": "git+https://github.com/hellohupu/agenda.git#feature/catatechcn",
     "apollo-cache-inmemory": "^1.6.2",
     "apollo-client": "^2.6.3",

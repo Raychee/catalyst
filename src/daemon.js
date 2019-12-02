@@ -4,12 +4,12 @@ const {MongoClient} = require('mongodb');
 
 const Agenda = require('agenda');
 
+const {sleep} = require('@raychee/utils');
 const {INDEXES} = require('./config');
 const {Logger} = require('./logger');
 const {TaskLoader, PluginLoader} = require('./loader');
 const {JobContextCache} = require('./task');
 const Operations = require('./operations');
-const {sleep} = require('./utils');
 
 
 module.exports = class {
