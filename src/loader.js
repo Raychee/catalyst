@@ -127,12 +127,11 @@ class TaskLoader {
         if (syncConfigsPeriodically) {
             (async () => {
                 while (true) {
+                    await sleep(this.syncConfigInterval * 1000);
                     try {
                         await this._syncConfigs();
                     } catch (e) {
                         console.error('Refreshing configs encounters an error: ' + e);
-                    } finally {
-                        await sleep(this.syncConfigInterval * 1000);
                     }
                 }
             })();

@@ -70,11 +70,10 @@ module.exports = class {
         const jobContextCache = new JobContextCache();
         const operations = new Operations(this.mongodb.db(service), undefined, jobContextCache);
         this.taskLoader = new TaskLoader(this.options.tasks, operations, pluginLoader, storeCollection, jobContextCache,
-            (name) => {
+            (name) =>
                 new Agenda({sort: {priority: -1, nextRunAt: 1}})
                     .name(name)
-                    .mongo(this.mongodb.db(agenda_), name);
-            },
+                    .mongo(this.mongodb.db(agenda_), name),
             '_task',
         );
         operations.taskLoader = this.taskLoader;
