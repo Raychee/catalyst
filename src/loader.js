@@ -290,9 +290,12 @@ class PluginLoader {
                 get(target, p, receiver) {
                     switch (p) {
                         case 'get':
+                            return async (pluginOpts, l) => {
+                                return await target.get(pluginOpts, l || logger);
+                            };
                         case 'create':
-                            return async (arg, l) => {
-                                return await target[p](arg, l || logger);
+                            return (plugin, l) => {
+                                return target.create(plugin, l || logger);
                             };
                         default:
                             return Reflect.get(target, p, receiver);
