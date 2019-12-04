@@ -252,17 +252,21 @@ class PluginLoader {
         const {plugin, logger: pluginLogger} = keyValue ?
             await this._get(keyValue, pluginOpts, create, job) :
             await this._create(pluginOpts, create, job);
+        return this.create(plugin, job || pluginLogger);
+    }
+
+    create(plugin, job) {
         return new Proxy(plugin, {
             get(target, p, receiver) {
                 const prop = Reflect.get(target, p, receiver);
                 if (typeof prop === 'function' && !p.startsWith('_')) {
-                    return prop.bind(target, job || pluginLogger);
+                    return prop.bind(target, job);
                 } else {
                     return prop;
                 }
             },
             apply(target, thisArg, argArray) {
-                return Reflect.apply(target, thisArg, [job || pluginLogger, ...argArray]);
+                return Reflect.apply(target, thisArg, [job, ...argArray]);
             }
         });
     }
@@ -284,12 +288,14 @@ class PluginLoader {
         if (logger) {
             pluginLoader = new Proxy(this, {
                 get(target, p, receiver) {
-                    if (p === 'get') {
-                        return async (pluginOpts, l) => {
-                            return await target.get(pluginOpts, l || logger);
-                        };
-                    } else {
-                        return Reflect.get(target, p, receiver);
+                    switch (p) {
+                        case 'get':
+                        case 'create':
+                            return async (arg, l) => {
+                                return await target[p](arg, l || logger);
+                            };
+                        default:
+                            return Reflect.get(target, p, receiver);
                     }
                 }
             });
