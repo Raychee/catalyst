@@ -3,8 +3,8 @@ const {UserInputError} = require('apollo-server-koa');
 const {diff} = require('deep-object-diff');
 const uuid = require('uuid/v4');
 
-const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, dedup} = require('@raychee/utils');
-const {JOB_DELAY_CHECK_INTERVAL, JOB_MIN_CHECK_INTERVAL} = require('./config');
+const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, limit} = require('@raychee/utils');
+const {JOB_DELAY_CHECK_INTERVAL, JOB_STATUS_CHECK_INTERVAL} = require('./config');
 const {Logger, JobLogger, StoreLogger} = require('./logger');
 const {
     CrawlerError,
@@ -81,12 +81,30 @@ class TaskType {
         if (!this.agendaFn) {
             this.agendaFn = async (agendaJob) => {
 
+                async function handleCrawlerError(job, e) {
+                    if (e instanceof CrawlerCancellation) {
+                        job._loggerSys.cancel('Job is canceled: ', e);
+                        await job._updateTrial({
+                            status: 'CANCELED', code: e.code || '_cancel', message: e.message,
+                        }, true);
+                        throw e;
+                    } else if (e instanceof CrawlerIntentionalCrash) {
+                        job._loggerSys.crash('Job crashes on purpose: ', e);
+                        await job._updateTrial({
+                            status: 'FAILED', code: e.code || '_crash_on_purpose', message: e.message, timeStopped: new Date(),
+                        }, true);
+                        throw e;
+                    } else if (e instanceof CrawlerInterruption) {
+                        throw e;
+                    }
+                }
+
                 const {jobId} = agendaJob.attrs.data;
                 if (!jobId) {
                     throw new Error('System internal error: neither taskId nor jobId is given');
                 }
 
-                const job = new Job(this, agendaJob);
+                const job = Job.create(this);
 
                 for (let trialCounter = 0;
                      trialCounter <= (job.config.retry || 0);
@@ -126,7 +144,6 @@ class TaskType {
                             job._loggerSys.retry(`${trialCounter}/${job.config.retry || 0}`);
                             await job._updateTrial({status: 'DELAYED'}, true);
                         }
-                        await job._checkStatusChange();
                         let delay = 0;
                         if (job.config.delay > 0) {
                             const {delayRandomize, retryDelayFactor} = job.config;
@@ -146,11 +163,12 @@ class TaskType {
                                 interval = awakeAt - Date.now();
                                 if (interval > JOB_DELAY_CHECK_INTERVAL * 1000) interval = JOB_DELAY_CHECK_INTERVAL * 1000;
                                 await sleep(interval);
-                                await job._checkStatusChange();
+                                job._checkStatusChange();
                             }
                         }
                         job._loggerSys.start('Job starts.');
                         await job._updateTrial({status: 'RUNNING'});
+                        job._started = true;
                         await this.run.call(job, job.config.params, job.config.context, this.store);
                         job._loggerSys.complete('Job completes.');
                         await job._updateTrial({status: 'SUCCESS'}, true);
@@ -159,28 +177,16 @@ class TaskType {
 
                     } catch (e) {
                         if (e instanceof CrawlerError) {
-                            if (e instanceof CrawlerCancellation) {
-                                job._loggerSys.cancel('Job is canceled: ', e);
-                                await job._updateTrial({
-                                    status: 'CANCELED', code: e.code || '_cancel', message: e.message,
-                                }, true);
-                                throw e;
-                            } else if (e instanceof CrawlerIntentionalCrash) {
-                                job._loggerSys.crash('Job crashes on purpose: ', e);
-                                await job._updateTrial({
-                                    status: 'FAILED', code: e.code || '_crash_on_purpose', message: e.message, timeStopped: new Date(),
-                                }, true);
-                                throw e;
-                            } else if (e instanceof CrawlerInterruption) {
-                                throw e;
-                            } else {
-                                job._loggerSys.fail('Job fails: ', e);
-                                await job._updateTrial({
-                                    status: 'FAILED', code: e.code || '_failed', message: e.message,
-                                }, true);
+                            await handleCrawlerError(job, e);
+                            job._loggerSys.fail('Job fails: ', e);
+                            await job._updateTrial({
+                                status: 'FAILED', code: e.code || '_failed', message: e.message,
+                            }, true);
+                            if (job._started) {
                                 try {
                                     await this.failed.call(job, e.code, e.message, job.config.params, job.config.context, this.store);
                                 } catch (ee) {
+                                    await handleCrawlerError(job, ee);
                                     job._loggerSys.crash('Job crashes in failed(): ', ee);
                                     await job._updateTrial({
                                         status: 'FAILED', code: '_crash_failed', message: errorToString(e), timeStopped: new Date(),
@@ -189,45 +195,38 @@ class TaskType {
                                 }
                             }
                         } else {
-                            let catchMessages;
-                            try {
-                                catchMessages = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
-                            } catch (ee) {
-                                if (ee instanceof CrawlerInterruption) {
-                                    throw ee;
-                                }
-                                job._loggerSys.crash('Job crashes in catch(): ', ee);
-                                if (job.config.id) {
+                            let catchMessages = undefined;
+                            if (job._started) {
+                                try {
+                                    catchMessages = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
+                                } catch (ee) {
+                                    await handleCrawlerError(job, ee);
+                                    job._loggerSys.crash('Job crashes in catch(): ', ee);
                                     await job._updateTrial({
                                         status: 'FAILED', code: '_crash_catch', message: errorToString(e), timeStopped: new Date(),
                                     }, true);
+                                    throw ee;
                                 }
-                                throw ee;
                             }
                             if (catchMessages) {
                                 if (!Array.isArray(catchMessages)) {
                                     catchMessages = [catchMessages];
                                 }
                                 job._loggerSys.catch('Job fails by catching: ', ...catchMessages);
-                                if (job.config.id) {
-                                    await job._updateTrial({
-                                        status: 'FAILED', code: e.code || '_catch', message: stringifyWith(catchMessages),
-                                    }, true);
-                                }
+                                await job._updateTrial({
+                                    status: 'FAILED', code: e.code || '_catch', message: stringifyWith(catchMessages),
+                                }, true);
                             } else {
                                 job._loggerSys.crash('Job crashes in run(): ', e);
-                                if (job.config.id) {
-                                    await job._updateTrial({
-                                        status: 'FAILED', code: '_crash_run', message: errorToString(e), timeStopped: new Date(),
-                                    }, true);
-                                }
+                                await job._updateTrial({
+                                    status: 'FAILED', code: '_crash_run', message: errorToString(e), timeStopped: new Date(),
+                                }, true);
                                 throw e;
                             }
                         }
 
                     } finally {
-                        if (!job._interrupted) {
-                            this.jobContextCache.clearCache(job.config);
+                        if (!job._interrupted && job._started) {
                             try {
                                 await this.final.call(job, job.config.params, job.config.context, this.store);
 
@@ -245,18 +244,15 @@ class TaskType {
                                 // }
 
                             } catch (e) {
-                                if (e instanceof CrawlerInterruption) {
-                                    throw e;
-                                }
+                                await handleCrawlerError(job, e);
                                 job._loggerSys.crash('Job crashes in final(): ', e);
-                                if (job.config.id) {
-                                    await job._updateTrial({
-                                        status: 'FAILED', code: e.code || '_crash_final', message: errorToString(e), timeStopped: new Date(),
-                                    }, true);
-                                }
+                                await job._updateTrial({
+                                    status: 'FAILED', code: e.code || '_crash_final', message: errorToString(e), timeStopped: new Date(),
+                                }, true);
                                 throw e;
                             }
                         }
+                        this.jobContextCache.clearCache(job.config);
                         await job._unload();
                     }
                 }
@@ -269,22 +265,38 @@ class TaskType {
 
 class Job {
 
-    constructor(taskType, agendaJob) {
+    constructor(taskType) {
         this.config = {};
         this._taskType = taskType;
 
-        this._interrupted = false;
+
         this._logger = undefined;
         this._loggerSys = undefined;
+        this._started = false;
+        this._done = false;
+        this._interrupted = false;
+        this._canceled = undefined;
 
-        this._checkStatusChange = dedup(Job.prototype._checkStatusChange.bind(this), {within: JOB_MIN_CHECK_INTERVAL * 1000});
+        this._update = limit(Job.prototype._update.bind(this), 1);
+    }
+
+    static create(taskType) {
+        const job = new Job(taskType);
+        return new Proxy(job, {
+            get(target, p) {
+                if (!p.startsWith('_')) {
+                    target._checkStatusChange();
+                }
+                const v = target[p];
+                return typeof v === 'function' ? v.bind(target) : v;
+            }
+        });
     }
 
     // schedule a new job (NOT a task!)
     // this function does NOT create a job entry in internal db;
     // it only calls agenda which in turn will execute job functions in which the job entry is created.
     async schedule(taskTypeFullName, params, context, extra) {
-        await this._checkStatusChange();
         let domainName, taskTypeName;
         if (taskTypeFullName instanceof Job) {
             domainName = taskTypeFullName._taskType.domain.name;
@@ -315,7 +327,6 @@ class Job {
     }
 
     async delay(delay, delayRandomize) {
-        await this._checkStatusChange();
         if (delay === undefined) delay = this.config.delay;
         if (delayRandomize === undefined) delayRandomize = this.config.delayRandomize;
         if (delay > 0) {
@@ -330,7 +341,7 @@ class Job {
                 interval = awakeAt - Date.now();
                 if (interval > JOB_DELAY_CHECK_INTERVAL * 1000) interval = JOB_DELAY_CHECK_INTERVAL * 1000;
                 await sleep(interval);
-                await this._checkStatusChange();
+                this._checkStatusChange();
             }
         }
     }
@@ -394,13 +405,16 @@ class Job {
         for (const [pluginName, plugin] of Object.entries(plugins)) {
             this[pluginName] = plugin;
         }
+
+        this._syncStatus().catch(e => console.log(`This should never happen: ${e}`));
     }
 
     async _unload() {
+        this._done = true;
         for (const pluginName of Object.keys(this._taskType.plugins)) {
             const plugin = this[pluginName];
-            if (plugin && plugin._destroy) {
-                await plugin._destroy();
+            if (plugin && plugin._onJobDone) {
+                await plugin._onJobDone();
             }
         }
     }
@@ -446,6 +460,11 @@ class Job {
 
     async _update(updates, updateContext) {
         updates = {...updates};
+        if (!this.config.id) {
+            console.log(`This should never happen: job.config.id = ${this.config.id}`);
+            return;
+        }
+        updates.id = this.config.id;
         if (updateContext) {
             updates.context = this.config.context;
         }
@@ -473,7 +492,6 @@ class Job {
                 return t;
             });
         }
-        if (this.config.id) updates.id = this.config.id;
         let updated;
         if (
             updates.status === 'SUCCESS' ||
@@ -494,22 +512,36 @@ class Job {
         this._taskType.jobContextCache.cache(this.config);
     }
 
-    async _checkStatusChange() {
-        await this._update(undefined, true);
+    _checkStatusChange() {
+        if (this._canceled) {
+            const message = this._canceled === '_cancel_status' ?
+                'Job cancels because of manual status change.' :
+                'Job cancels because the task is disabled.';
+            this.cancel(this._canceled, message);
+        }
         if (this._interrupted) {
             this._loggerSys.interrupt('Job is interrupted due to possible system shutdown.');
             this._logger.interrupt('_interrupt', 'Job is interrupted due to possible system shutdown.');
         }
-        if (this.config.status === 'CANCELED') {
-            this.cancel('_cancel_status', 'Job cancels because of manual status change.');
-        }
-        const task = await this._taskType.operations.getTask([this.config.task]);
-        if (!task.enabled) {
-            this.cancel('_cancel_disabled', 'Job cancels because the task is disabled.');
-        }
-        const diff = await this._taskType.operations.populateJobSchedulingProperties(this.config, task, undefined, true);
-        if (!isEmpty(diff)) {
-            await this._update(diff);
+    }
+
+    async _syncStatus() {
+        while (!this._done && !this._interrupted && !this._canceled) {
+            await sleep(JOB_STATUS_CHECK_INTERVAL * 1000);
+            if (!this.config.id) continue;
+            try {
+                const task = await this._taskType.operations.getTask([this.config.task]);
+                const diff = await this._taskType.operations.populateJobSchedulingProperties(this.config, task, undefined, true);
+                await this._update(diff, true);
+                if (this.config.status === 'CANCELED') {
+                    this._canceled ='_cancel_status';
+                }
+                if (!task.enabled) {
+                    this._canceled = '_cancel_disabled';
+                }
+            } catch (e) {
+                this._loggerSys.warn('Job status sync failed: ', e);
+            }
         }
     }
 

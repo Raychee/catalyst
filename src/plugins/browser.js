@@ -523,7 +523,7 @@ class Browser {
         }
     }
 
-    async _destroy() {
+    async _onJobDone() {
         return await this.close();
     }
 
