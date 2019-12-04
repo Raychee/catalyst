@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -27,6 +27,7 @@
     "apollo-link-retry": "^2.2.15",
     "apollo-server-koa": "^2.7.0",
     "dataloader": "^1.4.0",
+    "deep-object-diff": "^1.1.0",
     "graphql": "^14.4.2",
     "graphql-augment": "^0.3.29",
     "graphql-tag": "latest",
@@ -41,5 +42,8 @@
     "request-promise-native": "^1.0.7",
     "tough-cookie": "^3.0.1",
     "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "eslint": "^6.7.2"
   }
 }
