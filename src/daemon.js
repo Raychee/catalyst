@@ -95,11 +95,11 @@ module.exports = class {
 
         process.stdout.write(`${this.options.name} (daemon) is started.\n`);
 
-        process.on('SIGTERM', this.stop.bind(this));
-        process.on('SIGINT' , this.stop.bind(this));
+        process.on('SIGTERM', this.stop.bind(this, {exit: true}));
+        process.on('SIGINT' , this.stop.bind(this, {exit: true}));
     }
 
-    async stop() {
+    async stop({exit = false} = {}) {
         if (!this.taskLoader) {
             return;
         }
@@ -116,6 +116,11 @@ module.exports = class {
         process.stdout.write('Closing connections to database... ');
         await mongodb.close();
         process.stdout.write('\rClosing connections to database... Done.\n');
-        process.stdout.write(`${this.options.name} (daemon) exits.\n`);
+        process.stdout.write(`${this.options.name} (daemon) is stopped.\n`);
+
+        if (exit) {
+            process.stdout.write(`${this.options.name} (daemon) exits.\n`);
+            process.exit(0);
+        }
     }
 };
