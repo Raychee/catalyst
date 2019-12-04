@@ -86,8 +86,8 @@ class TaskLoader {
                 await this.operations.scheduleJob(jobConfig);
             });
         }
-        for await (let taskTypeFields of this._scan()) {
-            const [taskFilePath, domainName, taskFileName] = taskTypeFields;
+        for await (let scanned of this._scan()) {
+            const [taskFilePath, domainName, taskFileName] = scanned;
             let domain = this.loadedTaskDomains[domainName];
             if (!domain) {
                 domain = new TaskDomain(domainName, this.operations, this.pluginLoader, this.storeCollection);
@@ -96,15 +96,16 @@ class TaskLoader {
                     this.agendas[domainName] = this.newAgenda(domainName);
                 }
             }
-            if (taskTypeFields.length !== 3 || taskFileName !== 'domain') {
+            if (scanned.length !== 3 || taskFileName !== 'domain') {
                 continue;
             }
             const taskDomainSpec = require(taskFilePath);
             await domain.load(taskDomainSpec);
         }
-        for await (let taskTypeFields of this._scan()) {
-            const [taskFilePath, domainName, taskFileName] = taskTypeFields;
-            if (taskTypeFields.length === 3 && taskFileName === 'domain') {
+        for await (let scanned of this._scan()) {
+            const [taskFilePath, ...taskTypeFields] = scanned;
+            const [domainName, ...taskTypeNameFields] = taskTypeFields;
+            if (scanned.length === 3 && taskTypeNameFields[0] === 'domain') {
                 continue;
             }
             const domain = this.loadedTaskDomains[domainName];
@@ -112,7 +113,6 @@ class TaskLoader {
             if (this.loadedTaskTypes[taskTypeFullName]) {
                 throw new Error(`conflict task type: ${taskTypeFullName}`);
             }
-            const [, ...taskTypeNameFields] = taskTypeFields;
             const taskTypeName = taskTypeNameFields.join('.');
             const taskTypeSpec = require(taskFilePath);
             const taskType = new TaskType(
