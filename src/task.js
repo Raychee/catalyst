@@ -166,31 +166,31 @@ class TaskType {
                                 job._checkStatusChange();
                             }
                         }
-                        job._loggerSys.start('Job starts.');
                         await job._updateTrial({status: 'RUNNING'});
+                        job._loggerSys.start('Job starts.');
                         job._started = true;
                         await this.run.call(job, job.config.params, job.config.context, this.store);
-                        job._loggerSys.complete('Job completes.');
                         await job._updateTrial({status: 'SUCCESS'}, true);
+                        job._loggerSys.complete('Job completes.');
 
                         break;
 
                     } catch (e) {
                         if (e instanceof CrawlerError) {
                             await handleCrawlerError(job, e);
-                            job._loggerSys.fail('Job fails: ', e);
                             await job._updateTrial({
                                 status: 'FAILED', code: e.code || '_failed', message: e.message,
                             }, true);
+                            job._loggerSys.fail('Job fails: ', e);
                             if (job._started) {
                                 try {
                                     await this.failed.call(job, e.code, e.message, job.config.params, job.config.context, this.store);
                                 } catch (ee) {
                                     await handleCrawlerError(job, ee);
-                                    job._loggerSys.crash('Job crashes in failed(): ', ee);
                                     await job._updateTrial({
                                         status: 'FAILED', code: '_crash_failed', message: errorToString(e), timeStopped: new Date(),
                                     }, true);
+                                    job._loggerSys.crash('Job crashes in failed(): ', ee);
                                     throw ee;
                                 }
                             }
@@ -201,10 +201,10 @@ class TaskType {
                                     catchMessages = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
                                 } catch (ee) {
                                     await handleCrawlerError(job, ee);
-                                    job._loggerSys.crash('Job crashes in catch(): ', ee);
                                     await job._updateTrial({
                                         status: 'FAILED', code: '_crash_catch', message: errorToString(e), timeStopped: new Date(),
                                     }, true);
+                                    job._loggerSys.crash('Job crashes in catch(): ', ee);
                                     throw ee;
                                 }
                             }
@@ -212,21 +212,21 @@ class TaskType {
                                 if (!Array.isArray(catchMessages)) {
                                     catchMessages = [catchMessages];
                                 }
-                                job._loggerSys.catch('Job fails by catching: ', ...catchMessages);
                                 await job._updateTrial({
                                     status: 'FAILED', code: e.code || '_catch', message: stringifyWith(catchMessages),
                                 }, true);
+                                job._loggerSys.catch('Job fails by catching: ', ...catchMessages);
                             } else {
-                                job._loggerSys.crash('Job crashes in run(): ', e);
                                 await job._updateTrial({
                                     status: 'FAILED', code: '_crash_run', message: errorToString(e), timeStopped: new Date(),
                                 }, true);
+                                job._loggerSys.crash('Job crashes in run(): ', e);
                                 throw e;
                             }
                         }
 
                     } finally {
-                        if (!job._interrupted && job._started) {
+                        if (job._started) {
                             try {
                                 await this.final.call(job, job.config.params, job.config.context, this.store);
 
@@ -245,10 +245,10 @@ class TaskType {
 
                             } catch (e) {
                                 await handleCrawlerError(job, e);
-                                job._loggerSys.crash('Job crashes in final(): ', e);
                                 await job._updateTrial({
                                     status: 'FAILED', code: e.code || '_crash_final', message: errorToString(e), timeStopped: new Date(),
                                 }, true);
+                                job._loggerSys.crash('Job crashes in final(): ', e);
                                 throw e;
                             }
                         }
