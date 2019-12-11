@@ -116,7 +116,9 @@ class TaskType {
                             if (!jobConfig) {
                                 throw new Error('System internal error: neither jobId nor job is given');
                             }
-                            this.jobContextCache.loadBackTo(jobConfig);
+                            if (this.jobContextCache) {
+                                this.jobContextCache.loadBackTo(jobConfig);
+                            }
                             const updates = {};
                             let initContext = jobConfig.initContext;
                             if (!initContext) {
@@ -252,7 +254,9 @@ class TaskType {
                                 throw e;
                             }
                         }
-                        this.jobContextCache.clearCache(job.config);
+                        if (this.jobContextCache) {
+                            this.jobContextCache.clearCache(job.config);
+                        }
                         await job._unload();
                     }
                 }
@@ -516,7 +520,9 @@ class Job {
         }
         if (contextUpdate) this.config.context = contextUpdate;
         if (initContextUpdate) this.config.initContext = initContextUpdate;
-        this._taskType.jobContextCache.cache(this.config);
+        if (this._taskType.jobContextCache) {
+            this._taskType.jobContextCache.cache(this.config);
+        }
     }
 
     _checkStatusChange() {
