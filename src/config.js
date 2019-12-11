@@ -40,10 +40,7 @@ const INDEXES = {
         {key: {'id': 1}},
         {key: {'status': 1}},
         {key: {'createdFrom': 1, 'task': 1}},
-        {key: {'params.noteId': 1, 'timeCreated': -1, 'domain': 1, 'type': 1, 'status': 1}},
-        {key: {'params.userId': 1, 'timeCreated': -1, 'domain': 1, 'type': 1, 'status': 1}},
         {key: {'timeCreated': -1, 'domain': 1, 'type': 1, 'status': 1, 'params.userId': 1}},
-        // {key: {'timeStarted': 1}, expireAfterSeconds: 3 * 30 * 24 * 60 * 60},
     ]
 };
 

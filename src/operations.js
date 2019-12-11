@@ -247,10 +247,10 @@ class Operations {
         task = {...task};
         if (task.id) {
             // TODO: need lock for race condition
-            const updates = task;
-            const oldFullTask = await this.getTask([updates.id], undefined, dataloaders);
+            const {id, ...updates} = task;
+            const oldFullTask = await this.getTask([id], undefined, dataloaders);
             if (!oldFullTask) {
-                throw new UserInputError(`task "${updates.id}" does not exist.`);
+                throw new UserInputError(`task "${id}" does not exist.`);
             }
             let fullTask = {...oldFullTask, ...updates};
             await this._validateTask(fullTask);
@@ -260,15 +260,19 @@ class Operations {
             //         throw new UserInputError(`task of mode "ONCE" is already executed, so cannot be updated any more`);
             //     }
             // }
-            task = await this.upsert(
-                'Task', {...updates, _locked: true}, false, dataloaders,
-                {_locked: {$ne: true}}, true
-            );
+            if (!isEmpty(updates)) {
+                task = await this.upsert(
+                    'Task', {id, ...updates, _locked: true}, false, dataloaders,
+                    {_locked: {$ne: true}}, true
+                );
+            }
             fullTask = await this.getTask(task, undefined, dataloaders);
-            await this.upsert(
-                'Task', {id: task.id, _locked: false, _full: fullTask}, true, dataloaders
-            );
-            const [agendaJob] = await this.taskLoader.taskAgenda.jobs({'data.taskId': task.id});
+            if (!isEmpty(updates)) {
+                await this.upsert(
+                    'Task', {id, _locked: false, _full: fullTask}, true, dataloaders
+                );
+            }
+            const [agendaJob] = await this.taskLoader.taskAgenda.jobs({'data.taskId': id});
             let scheduleTime = undefined;
             if (fullTask.validAfter > Date.now()) {
                 scheduleTime = fullTask.validAfter;
@@ -276,7 +280,7 @@ class Operations {
             if (agendaJob) {
                 await this.saveAgendaJobForTask(agendaJob, fullTask, scheduleTime);
             } else {
-                console.error(`Warning - task ${task.id} does not have a corresponding agenda job instance, task scheduling is skipped.`);
+                console.error(`Warning - task ${id} does not have a corresponding agenda job instance, task scheduling is skipped.`);
             }
             return fullTask;
         } else {
@@ -564,11 +568,13 @@ class Operations {
             const task = await cursor.next();
             const fullTask = await this.getTask(task, taskTypeConfig, dataloaders);
             const taskDiff = diff(task._full, fullTask);
+            const taskKey = getKeyValues('Task', task);
             if (!isEmpty(taskDiff)) {
-                const taskKey = getKeyValues('Task', task);
                 setKeyValues('Task', taskDiff, taskKey);
-                promises.push(this.scheduleTask({id: task.id}));
+                promises.push(this.scheduleTask(taskDiff));
                 console.log(`Refresh config for task "${taskKey.join('.')}" of type "${taskTypeKey.join('.')}".`);
+            } else {
+                promises.push(this.scheduleTask(makeQuery('Task', taskKey)));
             }
         }
         if (promises.length > 0) {
