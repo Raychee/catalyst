@@ -23,7 +23,7 @@ config.FIELD_PREFIX_UPSERT = 'Update';
 module.exports = class {
     constructor(options) {
         this.options = options || {};
-        this.options.name = this.options.name || 'Service';
+        this.options.name = this.options.name || 'Catalyst';
         this.options.db = options.db || {};
         if (!this.options.db.host) throw new Error('db.host must be provided');
         this.options.db.port = this.options.db.port || 27017;

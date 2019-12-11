@@ -90,7 +90,7 @@ class TaskLoader {
             const [taskFilePath, domainName, taskFileName] = scanned;
             let domain = this.loadedTaskDomains[domainName];
             if (!domain) {
-                domain = new TaskDomain(domainName, this.operations, this.pluginLoader, this.storeCollection);
+                domain = new TaskDomain(domainName, this.pluginLoader, this.storeCollection);
                 this.loadedTaskDomains[domainName] = domain;
                 if (this.newAgenda && !this.agendas[domainName]) {
                     this.agendas[domainName] = this.newAgenda(domainName);
@@ -122,19 +122,21 @@ class TaskLoader {
             this.loadedTaskTypes[taskTypeFullName] = taskType;
         }
         this.loaded = true;
-        await this._syncConfigs();
 
-        if (syncConfigsPeriodically) {
-            (async () => {
-                while (true) {
-                    await sleep(this.syncConfigInterval * 1000);
-                    try {
-                        await this._syncConfigs();
-                    } catch (e) {
-                        console.error('Refreshing configs encounters an error: ' + e);
+        if (this.operations) {
+            await this._syncConfigs();
+            if (syncConfigsPeriodically) {
+                (async () => {
+                    while (true) {
+                        await sleep(this.syncConfigInterval * 1000);
+                        try {
+                            await this._syncConfigs();
+                        } catch (e) {
+                            console.error('Refreshing configs encounters an error: ' + e);
+                        }
                     }
-                }
-            })();
+                })();
+            }
         }
     }
 

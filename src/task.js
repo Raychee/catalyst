@@ -1,4 +1,4 @@
-const {isEmpty} = require('lodash');
+const {isEmpty, get} = require('lodash');
 const {UserInputError} = require('apollo-server-koa');
 const {diff} = require('deep-object-diff');
 const uuid = require('uuid/v4');
@@ -16,11 +16,10 @@ const {
 
 class TaskDomain {
 
-    constructor(name, operations, pluginLoader, storeCollection) {
+    constructor(name, pluginLoader, storeCollection) {
         this.name = name;
         this.config = {domain: this.name};
         this.store = {};
-        this.operations = operations;
         this.pluginLoader = pluginLoader;
         this.storeCollection = storeCollection;
     }
@@ -99,10 +98,8 @@ class TaskType {
                     }
                 }
 
-                const {jobId} = agendaJob.attrs.data;
-                if (!jobId) {
-                    throw new Error('System internal error: neither taskId nor jobId is given');
-                }
+                let jobId = get(agendaJob, ['attrs', 'data', 'jobId']);
+                let jobConfig = agendaJob;
 
                 const job = Job.create(this);
 
@@ -113,9 +110,12 @@ class TaskType {
                     await job._load();
                     try {
                         if (trialCounter === 0) {
-                            // this job is triggered by Operations.scheduleJob(),
-                            // or from an incomplete job (probably because of a system crash)
-                            const jobConfig = await this.operations.query('Job', [jobId]);
+                            if (jobId) {
+                                jobConfig = await this.operations.query('Job', [jobId]);
+                            }
+                            if (!jobConfig) {
+                                throw new Error('System internal error: neither jobId nor job is given');
+                            }
                             this.jobContextCache.loadBackTo(jobConfig);
                             const updates = {};
                             let initContext = jobConfig.initContext;
@@ -297,6 +297,7 @@ class Job {
     // this function does NOT create a job entry in internal db;
     // it only calls agenda which in turn will execute job functions in which the job entry is created.
     async schedule(taskTypeFullName, params, context, extra) {
+        if (!this._taskType.operations) return {};
         let domainName, taskTypeName;
         if (taskTypeFullName instanceof Job) {
             domainName = taskTypeFullName._taskType.domain.name;
@@ -406,7 +407,9 @@ class Job {
             this[pluginName] = plugin;
         }
 
-        this._syncStatus().catch(e => console.log(`This should never happen: ${e}`));
+        if (this._taskType.operations) {
+            this._syncStatus().catch(e => console.log(`This should never happen: ${e}`));
+        }
     }
 
     async _unload() {
@@ -493,13 +496,17 @@ class Job {
             });
         }
         let updated;
-        if (
-            updates.status === 'SUCCESS' ||
-            updates.status === 'FAILED' && updates.timeStopped
-        ) {
-            updated = await this._taskType.operations.upsert('Job', updates, false);
+        if (this._taskType.operations) {
+            if (
+                updates.status === 'SUCCESS' ||
+                updates.status === 'FAILED' && updates.timeStopped
+            ) {
+                updated = await this._taskType.operations.upsert('Job', updates, false);
+            } else {
+                updated = await this._taskType.operations.upsert('Job', updates, false, undefined, {status: {$ne: 'INTERRUPTED'}});
+            }
         } else {
-            updated = await this._taskType.operations.upsert('Job', updates, false, undefined, {status: {$ne: 'INTERRUPTED'}});
+            updated = {...this.config, ...updates};
         }
         if (updated) {
             this._setConfig(updated);

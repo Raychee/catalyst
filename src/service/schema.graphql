@@ -349,4 +349,9 @@ type TaskSchedulingConfig {
     retryDelayFactor: Float @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    """
+    任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
+    重复任务实例指的是同一个类型、参数完全相同的任务实例。
+    """
+    dedupRecent: Boolean @query @upsert
 }
