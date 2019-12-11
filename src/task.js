@@ -467,7 +467,7 @@ class Job {
 
     async _update(updates, updateContext) {
         updates = {...updates};
-        if (!this.config.id) {
+        if (!this.config.id && this._taskType.operations) {
             console.log(`This should never happen: job.config.id = ${this.config.id}`);
             return;
         }
