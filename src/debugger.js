@@ -102,7 +102,7 @@ module.exports = class {
             await taskType.load(taskTypeSpec);
         } else {
             const {domain, type} = job;
-            const taskType = await this.taskLoader.get([domain, type]);
+            taskType = await this.taskLoader.get([domain, type]);
             if (!taskType) {
                 throw new Error(`Task type "${domain}.${type}" is not valid.`);
             }
