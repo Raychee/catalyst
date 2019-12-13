@@ -204,15 +204,21 @@ module.exports = {
                             if (loadIdentityError) {
                                 const message = await loadIdentityError.call(logger, e, options, identity.data);
                                 if (message) {
+                                    const logMessages = Array.isArray(message) ? message : [message];
                                     logger.warn(
                                         'Loading identity failed with ',
                                         proxy || 'no proxy', ' / ', identity.id || 'no identity',
-                                        ' during request trial ', trial, '/', maxRetryIdentities, ': ', message
+                                        ' during request trial ', trial, '/', maxRetryIdentities, ': ', ...logMessages
                                     );
                                     if (identities) identities.deprecate(identity);
                                     identity = undefined;
                                     if (switchProxyOnInvalidIdentity) {
                                         proxy = undefined;
+                                    }
+                                    if (trial <= maxRetryIdentities) {
+                                        continue;
+                                    } else {
+                                        logger.fail('_request_load_identity_failed', ...logMessages);
                                     }
                                 }
                             }
