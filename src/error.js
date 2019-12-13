@@ -1,4 +1,3 @@
-
 class CrawlerError extends Error {
 
     constructor(code, message) {
@@ -28,11 +27,9 @@ class CrawlerInterruption extends CrawlerError {
 }
 
 
-class CrawlerSessionTimeoutError extends Error {
+class CrawlerTimeout extends CrawlerError {
     constructor(code, message) {
-        super(message);
-        this.name = 'CrawlerSessionTimeoutError';
-        this.code = code;
+        super(code, message);
     }
 }
 
@@ -41,5 +38,5 @@ module.exports = {
     CrawlerIntentionalCrash,
     CrawlerCancellation,
     CrawlerInterruption,
-    CrawlerSessionTimeoutError,
+    CrawlerTimeout,
 };

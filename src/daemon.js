@@ -5,7 +5,7 @@ const {MongoClient} = require('mongodb');
 const Agenda = require('agenda');
 
 const {sleep} = require('@raychee/utils');
-const {INDEXES} = require('./config');
+const {INDEXES, DEFAULT_JOB_HEARTBEAT, DEFAULT_JOB_HEART_ATTACK} = require('./config');
 const {Logger} = require('./logger');
 const {TaskLoader, PluginLoader} = require('./loader');
 const {JobContextCache} = require('./task');
@@ -25,7 +25,10 @@ module.exports = class {
         this.options.db.service = this.options.db.service || 'service';
         this.options.db.collections = this.options.db.collections || {};
         this.options.db.collections.store = this.options.db.collections.store || 'Store';
-        this.options.tasks = this.options.tasks || [];
+        this.options.tasks = this.options.tasks || {};
+        this.options.tasks.paths = this.options.tasks.paths || [];
+        this.options.tasks.heartbeat = this.options.tasks.heartbeat || DEFAULT_JOB_HEARTBEAT;
+        this.options.tasks.heartAttack = this.options.tasks.heartAttack || DEFAULT_JOB_HEART_ATTACK;
         this.options.plugins = this.options.plugins || {};
         this.options.plugins.paths = (this.options.plugins.paths || []).map(p => p === 'built-in' ? resolve(__dirname, 'plugins') : p);
         this.options.plugins.defaults = this.options.plugins.defaults || {};
@@ -62,14 +65,16 @@ module.exports = class {
         const storeCollection = this.mongodb.db(service).collection(store);
 
         process.stdout.write('Loading plugins... ');
-        const {paths, defaults, config} = this.options.plugins;
-        const pluginLoader = new PluginLoader(paths, storeCollection, defaults, config);
+        const {paths: pluginPaths, defaults, config} = this.options.plugins;
+        const pluginLoader = new PluginLoader(pluginPaths, storeCollection, defaults, config);
         await pluginLoader.load();
         process.stdout.write('\rLoading plugins... Done.\n');
 
+        process.stdout.write('Loading task types... ');
+        const {paths: taskPaths, ...taskOptions} = this.options.tasks;
         const jobContextCache = new JobContextCache();
-        const operations = new Operations(this.mongodb.db(service), undefined, jobContextCache);
-        this.taskLoader = new TaskLoader(this.options.tasks, operations, pluginLoader, storeCollection, jobContextCache,
+        const operations = new Operations(this.mongodb.db(service), undefined, jobContextCache, taskOptions);
+        this.taskLoader = new TaskLoader(taskPaths, operations, pluginLoader, storeCollection, jobContextCache,
             (name) =>
                 new Agenda({sort: {priority: -1, nextRunAt: 1}})
                     .name(name)
@@ -77,7 +82,6 @@ module.exports = class {
             '_task',
         );
         operations.taskLoader = this.taskLoader;
-        process.stdout.write('Loading task types... ');
         await this.taskLoader.load({syncConfigsPeriodically: true});
         process.stdout.write('\rLoading task types... Done.\n');
 

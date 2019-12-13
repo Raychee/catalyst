@@ -7,16 +7,17 @@ const {DEFAULT_TASK_DOMAIN_CONFIG, TYPES} = require('./config');
 
 
 const SCHEDULING_PROPERTIES = [
-    'delay', 'delayRandomize', 'retry', 'retryDelayFactor', 'priority', 'dedupWithin', 'dedupRecent'
+    'timeout', 'delay', 'delayRandomize', 'retry', 'retryDelayFactor', 'priority', 'dedupWithin', 'dedupRecent'
 ];
 
 
 class Operations {
 
-    constructor(mongodb, taskLoader, jobContextCache) {
+    constructor(mongodb, taskLoader, jobContextCache, options) {
         this.mongodb = mongodb;
         this.taskLoader = taskLoader;
         this.jobContextCache = jobContextCache;
+        this.options = options || {};
     }
 
     // domain is either a domain config object, or an array like ["domainName"].
@@ -152,9 +153,7 @@ class Operations {
             agendaConfig.concurrency = concurrency;
             agendaConfig.lockLimit = concurrency;
         }
-        if (fullConfig.timeout !== undefined) {
-            agendaConfig.lockLifetime = fullConfig.timeout > 0 ? fullConfig.timeout * 1000 : Number.MAX_SAFE_INTEGER;
-        }
+        agendaConfig.lockLifetime = this.options.heartAttack > 0 ? this.options.heartAttack * 1000 : Number.MAX_SAFE_INTEGER;
         if (fullConfig.priority !== undefined) {
             agendaConfig.priority = fullConfig.priority;
         }

@@ -1,16 +1,16 @@
-const {isEmpty, get} = require('lodash');
+const {isEmpty, isPlainObject, get} = require('lodash');
 const {UserInputError} = require('apollo-server-koa');
 const {diff} = require('deep-object-diff');
 const uuid = require('uuid/v4');
 
 const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, limit} = require('@raychee/utils');
-const {JOB_DELAY_CHECK_INTERVAL, JOB_STATUS_CHECK_INTERVAL} = require('./config');
 const {Logger, JobLogger, StoreLogger} = require('./logger');
 const {
     CrawlerError,
     CrawlerCancellation,
     CrawlerIntentionalCrash,
-    CrawlerInterruption
+    CrawlerInterruption,
+    CrawlerTimeout
 } = require('./error');
 
 
@@ -87,6 +87,12 @@ class TaskType {
                             status: 'CANCELED', code: e.code || '_cancel', message: e.message,
                         }, true);
                         throw e;
+                    } else if (e instanceof CrawlerTimeout) {
+                        job._loggerSys.timeout('Job timeout: ', e);
+                        await job._updateTrial({
+                            status: 'FAILED', code: e.code || '_timeout', message: e.message,
+                        }, true);
+                        throw e;
                     } else if (e instanceof CrawlerIntentionalCrash) {
                         job._loggerSys.crash('Job crashes on purpose: ', e);
                         await job._updateTrial({
@@ -98,10 +104,12 @@ class TaskType {
                     }
                 }
 
-                let jobId = get(agendaJob, ['attrs', 'data', 'jobId']);
-                let jobConfig = agendaJob;
-
-                const job = Job.create(this);
+                let jobConfig = undefined;
+                if (isPlainObject(agendaJob)) {
+                    jobConfig = agendaJob;
+                    agendaJob = undefined;
+                }
+                const job = Job.create(this, agendaJob);
 
                 for (let trialCounter = 0;
                      trialCounter <= (job.config.retry || 0);
@@ -110,8 +118,11 @@ class TaskType {
                     await job._load();
                     try {
                         if (trialCounter === 0) {
-                            if (jobId) {
-                                jobConfig = await this.operations.query('Job', [jobId]);
+                            if (!jobConfig) {
+                                if (agendaJob) {
+                                    const jobId = get(agendaJob, ['attrs', 'data', 'jobId']);
+                                    jobConfig = await this.operations.query('Job', [jobId]);
+                                }
                             }
                             if (!jobConfig) {
                                 throw new Error('System internal error: neither jobId nor job is given');
@@ -160,17 +171,18 @@ class TaskType {
                         await job._updateTrial({delay});
                         if (delay > 0) {
                             const awakeAt = Date.now() + delay * 1000;
+                            const heartbeat = this.operations ? this.operations.options.heartbeat * 1000 : Number.MAX_SAFE_INTEGER;
                             let interval = 1;
                             while (interval > 0) {
                                 interval = awakeAt - Date.now();
-                                if (interval > JOB_DELAY_CHECK_INTERVAL * 1000) interval = JOB_DELAY_CHECK_INTERVAL * 1000;
+                                if (interval > heartbeat) interval = heartbeat;
                                 await sleep(interval);
                                 job._checkStatusChange();
                             }
                         }
                         await job._updateTrial({status: 'RUNNING'});
                         job._loggerSys.start('Job starts.');
-                        job._started = true;
+                        job._started = Date.now();
                         await this.run.call(job, job.config.params, job.config.context, this.store);
                         await job._updateTrial({status: 'SUCCESS'}, true);
                         job._loggerSys.complete('Job completes.');
@@ -269,15 +281,17 @@ class TaskType {
 
 class Job {
 
-    constructor(taskType) {
+    constructor(taskType, agendaJob) {
         this.config = {};
         this._taskType = taskType;
+        this._agendaJob = agendaJob;
 
 
         this._logger = undefined;
         this._loggerSys = undefined;
-        this._started = false;
+        this._started = undefined;
         this._done = false;
+        this._timeout = undefined;
         this._interrupted = false;
         this._canceled = undefined;
 
@@ -341,10 +355,11 @@ class Job {
             delay = random(delayMin, delayMax);
 
             const awakeAt = Date.now() + delay * 1000;
+            const heartbeat = this._taskType.operations ? this._taskType.operations.options.heartbeat * 1000 : Number.MAX_SAFE_INTEGER;
             let interval = 1;
             while (interval > 0) {
                 interval = awakeAt - Date.now();
-                if (interval > JOB_DELAY_CHECK_INTERVAL * 1000) interval = JOB_DELAY_CHECK_INTERVAL * 1000;
+                if (interval > heartbeat) interval = heartbeat;
                 await sleep(interval);
                 this._checkStatusChange();
             }
@@ -536,11 +551,14 @@ class Job {
             this._loggerSys.interrupt('Job is interrupted due to possible system shutdown.');
             this._logger.interrupt('_interrupt', 'Job is interrupted due to possible system shutdown.');
         }
+        if (this._timeout) {
+            this._logger.timeout('_timeout', 'Job execution time exceeds ', this.config.timeout, ' seconds and is terminated.');
+        }
     }
 
     async _syncStatus() {
-        while (!this._done && !this._interrupted && !this._canceled) {
-            await sleep(JOB_STATUS_CHECK_INTERVAL * 1000);
+        while (!this._done && !this._interrupted && !this._canceled && !this._timeout) {
+            await sleep(this._taskType.operations.options.heartbeat * 1000);
             if (!this.config.id) continue;
             try {
                 const task = await this._taskType.operations.getTask([this.config.task]);
@@ -551,6 +569,12 @@ class Job {
                 }
                 if (!task.enabled) {
                     this._canceled = '_cancel_disabled';
+                }
+                if (this._agendaJob) {
+                    await this._agendaJob.touch();
+                }
+                if (this.config.timeout > 0 && this._started < Date.now() - this.config.timeout * 1000) {
+                    this._timeout = true;
                 }
             } catch (e) {
                 this._loggerSys.warn('Job status sync failed: ', e);

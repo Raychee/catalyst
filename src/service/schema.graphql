@@ -132,10 +132,10 @@ type Task {
     "任务优先级，一般为0，数字越大优先级越高"
     priority: Int @query @upsert
     "任务执行有效时间; 如果没有设定该值，则认为 Task 长期有效"
+    # @auth(query: ["A:q", "Task:priority:q"], result: ["A:r", "Task:priority:r"])
     validBefore: DateTime @query @upsert
     "任务开始有效执行时间; 如果没有设定该值，则认为 Task 长期有效"
     validAfter: DateTime @query @upsert
-    # @auth(query: ["A:q", "Task:priority:q"], result: ["A:r", "Task:priority:r"])
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
     # @auth(query: ["A:q", "Task:dedupWithin:q"], result: ["A:r", "Task:dedupWithin:r"])
@@ -144,6 +144,8 @@ type Task {
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
     """
     dedupRecent: Boolean @query @upsert
+    "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
+    timeout: Int @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
     delay: Float @query @upsert
     # @auth(query: ["A:q", "Task:delay:q"], result: ["A:r", "Task:delay:r"])
@@ -237,6 +239,8 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
     """
     dedupRecent: Boolean @query @upsert
+    "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
+    timeout: Int @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
     delay: Float @query
     # @auth(query: ["Job:delay:q"], result: ["Job:delay:r"])

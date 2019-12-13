@@ -33,7 +33,8 @@ module.exports = class {
         this.options.db.service = this.options.db.service || 'service';
         this.options.db.collections = this.options.db.collections || {};
         this.options.db.collections.store = this.options.db.collections.store || 'Store';
-        this.options.tasks = this.options.tasks || [];
+        this.options.tasks = this.options.tasks || {};
+        this.options.tasks.paths = this.options.tasks.paths || [];
         this.options.api = this.options.api || {};
         this.options.api.secret = this.options.api.secret || '';
         this.options.logging = this.options.logging || {};
@@ -64,7 +65,7 @@ module.exports = class {
 
         const storeCollection = this.mongodb.db(service).collection(store);
         const operations = new Operations(this.mongodb.db(service));
-        const taskLoader = new TaskLoader(this.options.tasks, operations, undefined, storeCollection, undefined,
+        const taskLoader = new TaskLoader(this.options.tasks.paths, operations, undefined, storeCollection, undefined,
             (name) =>
                 new Agenda({sort: {priority: -1, nextRunAt: 1}})
                     .name(name)

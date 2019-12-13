@@ -20,7 +20,8 @@ module.exports = class {
         this.options.db.password = this.options.db.password || '';
         this.options.db.collections = this.options.db.collections || {};
         this.options.db.collections.store = this.options.db.collections.store || 'Store';
-        this.options.tasks = this.options.tasks || [];
+        this.options.tasks = this.options.tasks || {};
+        this.options.tasks.paths = this.options.tasks.paths || [];
         this.options.plugins = this.options.plugins || {};
         this.options.plugins.paths = (this.options.plugins.paths || []).map(p => p === 'built-in' ? resolve(__dirname, 'plugins') : p);
         this.options.plugins.defaults = this.options.plugins.defaults || {};
@@ -63,7 +64,7 @@ module.exports = class {
         await pluginLoader.load();
         process.stdout.write('\rLoading plugins... Done.\n');
 
-        this.taskLoader = new TaskLoader(this.options.tasks, undefined, pluginLoader, storeCollection);
+        this.taskLoader = new TaskLoader(this.options.tasks.paths, undefined, pluginLoader, storeCollection);
         process.stdout.write('Loading task types... ');
         await this.taskLoader.load();
         process.stdout.write('\rLoading task types... Done.\n');

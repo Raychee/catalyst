@@ -1,7 +1,13 @@
 const {isEmpty} = require('lodash');
 
 const {ensureThunkSync, sleep, dedup, flatten, stringifyWith} = require('@raychee/utils');
-const {CrawlerError, CrawlerIntentionalCrash, CrawlerCancellation, CrawlerInterruption} = require('./error');
+const {
+    CrawlerError,
+    CrawlerIntentionalCrash,
+    CrawlerCancellation,
+    CrawlerInterruption,
+    CrawlerTimeout,
+} = require('./error');
 
 
 const LOGGING_LEVELS = {
@@ -63,6 +69,10 @@ class Logger {
         throw new CrawlerInterruption(code, stringifyWith(values, {transform: this.transform}), this);
     }
 
+    timeout(code, ...values) {
+        throw new CrawlerTimeout(code, stringifyWith(values, {transform: this.transform}), this);
+    }
+
     _log(log, logCategory, ...values) {
         const prefixes = ensureThunkSync(this.prefixes);
         const timestamp = this.SHOW_TIMESTAMP ? `${new Date().toLocaleString()} - ` : '';
@@ -108,7 +118,7 @@ class JobLogger extends Logger {
 
     cancel(...values) {
         if (this._level() <= LOGGING_LEVELS.INFO) {
-            this._log(console.error, 'Cancel', ...values);
+            this._log(console.log, 'Cancel', ...values);
         }
     }
 
@@ -133,6 +143,12 @@ class JobLogger extends Logger {
     interrupt(...values) {
         if (this._level() <= LOGGING_LEVELS.ERROR) {
             this._log(console.error, 'Interrupt', ...values);
+        }
+    }
+
+    timeout(...values) {
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.error, 'Timeout', ...values);
         }
     }
 
