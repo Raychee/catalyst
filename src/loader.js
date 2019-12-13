@@ -153,21 +153,31 @@ class TaskLoader {
         process.stdout.write('Re-scheduling interrupted jobs... ');
         const now = new Date();
         for (const agenda of Object.values(this.agendas)) {
-            let agendaJobs = await agenda.jobs({
-                type: 'normal', lastFinishedAt: null, lockedAt: null, nextRunAt: null, disabled: {$ne: true}
-            });
-            for (const agendaJob of agendaJobs) {
-                const {jobId} = agendaJob.attrs.data;
-                if (jobId) {
-                    await this.operations.upsert('Job', {id: jobId, status: 'PENDING'}, true, undefined, {id: jobId});
+            while (true) {
+                const agendaJobs = await agenda.jobs({
+                    type: 'normal', lastFinishedAt: null, lockedAt: null, nextRunAt: null, disabled: {$ne: true}
+                }, {}, 200);
+                if (agendaJobs.length > 0) {
+                    await Promise.all(agendaJobs.map(async agendaJob => {
+                        const {jobId} = agendaJob.attrs.data;
+                        if (jobId) {
+                            await this.operations.upsert('Job', {id: jobId, status: 'PENDING'}, true, undefined, {id: jobId});
+                        }
+                        agendaJob.schedule(now);
+                        await agendaJob.save();
+                    }));
+                } else {
+                    break;
                 }
-                agendaJob.schedule(now);
-                await agendaJob.save();
             }
         }
-        const jobs = await this.operations.query('Job', {status: 'INTERRUPTED'});
-        for (const {id} of jobs) {
-            await this.operations.scheduleJob({id, status: 'PENDING'});
+        while (true) {
+            const jobs = await this.operations.query('Job', {status: 'INTERRUPTED'}, {limit: 200});
+            if (jobs.length > 0) {
+                await Promise.all(jobs.map(({id}) => this.operations.scheduleJob({id, status: 'PENDING'})));
+            } else {
+                break;
+            }
         }
         process.stdout.write('\rRe-scheduling interrupted jobs... Done.\n');
         await this._start();
