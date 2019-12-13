@@ -182,6 +182,7 @@ module.exports = {
                 }
                 let trial = 0, options = _options;
                 while (true) {
+                    trial++;
                     if (identities && !identity || proxies && !proxy) {
                         await launch(logger);
                     }
@@ -231,7 +232,6 @@ module.exports = {
                     }
                     let response, error, proxyInvalidMessage, identityInvalidMessage;
                     try {
-                        trial++;
                         response = await req(logger, options);
                         // logger.info('request(', options, ') ', proxy || 'no proxy', ' / ', identity && identity.id || 'no identity', ' -> resp');
                     } catch (e) {
