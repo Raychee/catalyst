@@ -218,7 +218,7 @@ class TaskType {
                         }
 
                     } finally {
-                        if (!job._interrupted && job._started) {
+                        if (!job._interrupted && !job._timeout && job._started) {
                             try {
                                 await this.final.call(job, job.config.params, job.config.context, this.store);
 

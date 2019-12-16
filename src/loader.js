@@ -253,7 +253,7 @@ class PluginLoader {
         if (!pluginFns) {
             throw new Error(`plugin ${pluginOption.type} does not exist.`);
         }
-        const {key, create, destroy, config = {}} = pluginFns;
+        const {key} = pluginFns;
         let keyValue = undefined;
         if (key) {
             keyValue = key(pluginOption);
@@ -261,19 +261,12 @@ class PluginLoader {
                 keyValue = stableStringify(keyValue);
             }
         }
-        const {instance, logger: pluginLogger} = keyValue ?
-            await this._get(keyValue, pluginOption, create, job) :
-            await this._create(pluginOption, create, job);
+        const plugin = keyValue ?
+            await this._get(keyValue, pluginOption, pluginFns, job) :
+            await this._create(pluginOption, pluginFns, job);
         return {
-            instance: this.create(instance, job || pluginLogger),
-            destroy: async () => {
-                try {
-                    await destroy.call(pluginLogger, instance);
-                } catch (e) {
-                    pluginLogger.warn('Plugin unload error: ', e);
-                }
-            },
-            key: keyValue, config,
+            ...plugin,
+            instance: this.create(plugin.instance, job || plugin.logger),
         };
     }
 
@@ -293,18 +286,19 @@ class PluginLoader {
         });
     }
 
-    async _get(keyValue, pluginOption, create, logger) {
+    async _get(keyValue, pluginOption, pluginFns, logger) {
         const existing = get(this.loadedPlugins, [pluginOption.type, keyValue]);
         if (existing) {
             return existing;
         } else {
-            const new_ = await this._create(pluginOption, create, logger);
+            const new_ = await this._create(pluginOption, pluginFns, logger);
+            new_.key = keyValue;
             setWith(this.loadedPlugins, [pluginOption.type, keyValue], new_, Object);
             return new_;
         }
     }
 
-    async _create(pluginOption, create, logger) {
+    async _create(pluginOption, {create, destroy, config}, logger) {
         const pluginLogger = new StoreLogger(this.storeCollection, {plugin: pluginOption.type}, 'Plugin', [pluginOption.type]);
         let pluginLoader = this;
         if (logger) {
@@ -326,7 +320,17 @@ class PluginLoader {
             });
         }
         const instance = await create.call(pluginLogger, pluginOption, {pluginLoader});
-        return {instance, logger: pluginLogger};
+        return {
+            instance, logger: pluginLogger, config,
+            destroy: async () => {
+                if (!destroy) return;
+                try {
+                    await destroy.call(pluginLogger, instance);
+                } catch (e) {
+                    pluginLogger.warn('Plugin unload error: ', e);
+                }
+            },
+        };
     }
 
     async getAllPluginFns() {

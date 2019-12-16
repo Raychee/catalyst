@@ -10,7 +10,7 @@ const {RetryLink} = require('apollo-link-retry');
 const {createPersistedQueryLink} = require('apollo-link-persisted-queries');
 const {InMemoryCache} = require('apollo-cache-inmemory');
 const fetch = require('node-fetch');
-const {get, isEmpty} = require('lodash');
+const {get, isEmpty, lowerFirst} = require('lodash');
 
 const {dedup} = require('@raychee/utils');
 
@@ -97,6 +97,7 @@ class GraphQLClient {
                 defaultProjections = {results: defaultProjections};
             }
             this[`query${field.name}`] = async (logger, variables, projections) => {
+                logger = logger || this.logger;
                 if (!projections || isEmpty(projections)) projections = defaultProjections;
                 try {
                     const resp = await this.apolloClient.query({
@@ -125,7 +126,8 @@ class GraphQLClient {
             if (hasResults) {
                 defaultProjections = {results: defaultProjections};
             }
-            this[`${field.name[0].toLowerCase()}${field.name.slice(1)}`] = async (logger, variables, projections) => {
+            this[lowerFirst(field.name)] = async (logger, variables, projections) => {
+                logger = logger || this.logger;
                 if (!projections || isEmpty(projections)) projections = defaultProjections;
                 try {
                     const resp = await this.apolloClient.mutate({
