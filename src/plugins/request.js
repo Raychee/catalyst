@@ -121,10 +121,12 @@ module.exports = {
 
         if (identities || proxies) {
             if (identities && typeof identities === "object" && identities.constructor === Object) {
-                identities = await pluginLoader.get({type: 'identities', ...identities});
+                const plugin = await pluginLoader.get({type: 'identities', ...identities});
+                identities = plugin.instance;
             }
             if (proxies && typeof proxies === "object" && proxies.constructor === Object) {
-                proxies = await pluginLoader.get({type: 'proxies', ...proxies});
+                const plugin = await pluginLoader.get({type: 'proxies', ...proxies});
+                proxies = plugin.instance;
             }
             if (identities) extra.identities = identities;
             if (proxies) extra.proxies = proxies;
@@ -140,7 +142,7 @@ module.exports = {
                 let _req = undefined;
                 return async (...args) => {
                     if (!_req) {
-                        _req = await pluginLoader.get({
+                        const plugin = await pluginLoader.get({
                             type: 'request',
                             defaults, smartError, proxies,
                             maxRetryIdentities, switchIdentityOnInvalidProxy, switchProxyOnInvalidIdentity,
@@ -148,6 +150,7 @@ module.exports = {
                             defaultIdentityId, loadIdentityError,
                             lockIdentityUntilLoaded
                         });
+                        _req = plugin.instance;
                     }
                     return await _req(...args);
                 };

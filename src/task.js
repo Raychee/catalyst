@@ -267,6 +267,7 @@ class Job {
 
         this._logger = undefined;
         this._loggerSys = undefined;
+        this._plugins = undefined;
         this._started = undefined;
         this._done = false;
         this._timeout = undefined;
@@ -384,9 +385,9 @@ class Job {
                 }
             );
         }
-        const plugins = await this._taskType.pluginLoader.ensurePluginInstances(this._taskType.plugins, this);
-        for (const [pluginName, plugin] of Object.entries(plugins)) {
-            this[pluginName] = plugin;
+        this._plugins = await this._taskType.pluginLoader.getAll(this._taskType.plugins, this);
+        for (const [pluginName, {instance}] of Object.entries(this._plugins)) {
+            this[pluginName] = instance;
         }
 
         if (this._taskType.operations) {
@@ -442,12 +443,13 @@ class Job {
 
     async _unload() {
         this._done = true;
-        for (const pluginName of Object.keys(this._taskType.plugins)) {
-            const plugin = this[pluginName];
-            if (plugin && plugin._onJobDone) {
-                await plugin._onJobDone();
+        await Promise.all(Object.values(this._plugins).map(
+            async ({key, destroy, config}) => {
+                if (!key || config.destroyOnJobDone) {
+                    await destroy();
+                }
             }
-        }
+        ));
     }
 
     async _updateTrial({status, delay, code, message, timeStopped}, updateContext) {

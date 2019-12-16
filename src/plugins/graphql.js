@@ -15,7 +15,7 @@ const {get, isEmpty} = require('lodash');
 const {dedup} = require('@raychee/utils');
 
 
-class DataClient {
+class GraphQLClient {
     constructor(logger, uri, id, password, httpOptions = {}) {
         // httpOptions - https://www.apollographql.com/docs/link/links/http/#options
         this.logger = logger;
@@ -79,7 +79,7 @@ class DataClient {
             }
         });
 
-        this._authenticate = dedup(DataClient.prototype._authenticate.bind(this));
+        this._authenticate = dedup(GraphQLClient.prototype._authenticate.bind(this));
     }
 
     async _connect() {
@@ -202,7 +202,7 @@ module.exports = {
         return options;
     },
     async create({uri, id, password, httpOptions} = {}) {
-        const client = new DataClient(this, uri, id, password, httpOptions);
+        const client = new GraphQLClient(this, uri, id, password, httpOptions);
         await client._connect();
         return client;
     }

@@ -30,7 +30,9 @@ module.exports = class {
         this.options.tasks.heartbeat = this.options.tasks.heartbeat || DEFAULT_JOB_HEARTBEAT;
         this.options.tasks.heartAttack = this.options.tasks.heartAttack || DEFAULT_JOB_HEART_ATTACK;
         this.options.plugins = this.options.plugins || {};
-        this.options.plugins.paths = (this.options.plugins.paths || []).map(p => p === 'built-in' ? resolve(__dirname, 'plugins') : p);
+        this.options.plugins.paths = (this.options.plugins.paths || []).map(p =>
+            p.replace(/^\/\//, resolve(__dirname, 'plugins') + '/')
+        );
         this.options.plugins.defaults = this.options.plugins.defaults || {};
         this.options.plugins.config = this.options.plugins.config || {};
         this.options.daemon = this.options.daemon || {};
@@ -40,6 +42,7 @@ module.exports = class {
         this.options.logging.showTimestamp = this.options.logging.showTimestamp || false;
 
         this.taskLoader = undefined;
+        this.pluginLoader = undefined;
         this.mongodb = undefined;
 
         Logger.prototype.LOGGING_LEVEL = this.options.logging.level;
@@ -66,15 +69,15 @@ module.exports = class {
 
         process.stdout.write('Loading plugins... ');
         const {paths: pluginPaths, defaults, config} = this.options.plugins;
-        const pluginLoader = new PluginLoader(pluginPaths, storeCollection, defaults, config);
-        await pluginLoader.load();
+        this.pluginLoader = new PluginLoader(pluginPaths, storeCollection, defaults, config);
+        await this.pluginLoader.load();
         process.stdout.write('\rLoading plugins... Done.\n');
 
         process.stdout.write('Loading task types... ');
         const {paths: taskPaths, ...taskOptions} = this.options.tasks;
         const jobContextCache = new JobContextCache();
         const operations = new Operations(this.mongodb.db(service), undefined, jobContextCache, taskOptions);
-        this.taskLoader = new TaskLoader(taskPaths, operations, pluginLoader, storeCollection, jobContextCache,
+        this.taskLoader = new TaskLoader(taskPaths, operations, this.pluginLoader, storeCollection, jobContextCache,
             (name) =>
                 new Agenda({sort: {priority: -1, nextRunAt: 1}})
                     .name(name)
@@ -108,11 +111,16 @@ module.exports = class {
             return;
         }
         const taskLoader = this.taskLoader;
+        const pluginLoader = this.pluginLoader;
         const mongodb = this.mongodb;
         this.taskLoader = undefined;
+        this.pluginLoader = undefined;
         this.mongodb = undefined;
         process.stdout.write(`${this.options.name} (daemon) is shutting down.\n`);
+        process.stdout.write('Stopping and unloading components... ');
         await taskLoader.stop();
+        await pluginLoader.unload();
+        process.stdout.write('\rStopping and unloading components... Done.\n');
         if (this.options.daemon.waitBeforeStop > 0) {
             process.stdout.write(`Wait ${this.options.daemon.waitBeforeStop} secs for running jobs to stop. \n`);
             await sleep(this.options.daemon.waitBeforeStop * 1000);

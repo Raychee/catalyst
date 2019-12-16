@@ -17,6 +17,7 @@ class Identities {
 
         this._init = dedup(Identities.prototype._init.bind(this));
         this._get = dedup(Identities.prototype._get.bind(this), {key: null});
+        this.__syncStore = Identities.prototype._syncStoreForce.bind(this);
     }
 
     async _init() {
@@ -43,7 +44,7 @@ class Identities {
         this.options = this._makeOptions(options);
         if (minIntervalBetweenStoreUpdate !== this.options.minIntervalBetweenStoreUpdate) {
             this.__syncStore = dedup(
-                Identities.prototype.__syncStore.bind(this),
+                Identities.prototype._syncStoreForce.bind(this),
                 {within: this.options.minIntervalBetweenStoreUpdate * 1000}
             );
         }
@@ -194,7 +195,11 @@ class Identities {
         return {id, identity: this.identities[id]};
     }
 
-    async __syncStore() {
+    _syncStore() {
+        this.__syncStore().catch(e => console.error('This should never happen: ', e));
+    }
+
+    async _syncStoreForce() {
         let deleteNullIdentities = true;
         if (this.stored) {
             try {
@@ -210,10 +215,6 @@ class Identities {
                 .filter(([, i]) => !i)
                 .forEach(([id]) => delete this.identities[id]);
         }
-    }
-
-    _syncStore() {
-        this.__syncStore().catch(e => console.error('This should never happen: ', e));
     }
 
     _isAvailable(identity) {
@@ -250,5 +251,8 @@ module.exports = {
         const identities = new Identities(this, name, options, stored);
         await identities._init();
         return identities;
+    },
+    async destroy(identities) {
+        await identities._syncStoreForce();
     }
 };

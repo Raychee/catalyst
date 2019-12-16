@@ -241,34 +241,44 @@ class PluginLoader {
         this.storeCollection = storeCollection;
         this.loaded = false;
         this.loadedPluginFns = {};
-        this.loadedPluginInstances = {};
+        this.loadedPlugins = {};
         this.defaultPlugins = defaultPlugins;
         this.metaConfigs = metaConfigs;
 
         this._get = limit(PluginLoader.prototype._get, 1);
     }
 
-    async get(pluginOpts, job) {
-        const pluginFns = (await this.getAllPluginFns())[pluginOpts.type];
+    async get(pluginOption, job) {
+        const pluginFns = (await this.getAllPluginFns())[pluginOption.type];
         if (!pluginFns) {
-            throw new Error(`plugin ${pluginOpts.type} does not exist.`);
+            throw new Error(`plugin ${pluginOption.type} does not exist.`);
         }
-        const {key, create} = pluginFns;
+        const {key, create, destroy, config = {}} = pluginFns;
         let keyValue = undefined;
         if (key) {
-            keyValue = key(pluginOpts);
+            keyValue = key(pluginOption);
             if (keyValue) {
                 keyValue = stableStringify(keyValue);
             }
         }
-        const {plugin, logger: pluginLogger} = keyValue ?
-            await this._get(keyValue, pluginOpts, create, job) :
-            await this._create(pluginOpts, create, job);
-        return this.create(plugin, job || pluginLogger);
+        const {instance, logger: pluginLogger} = keyValue ?
+            await this._get(keyValue, pluginOption, create, job) :
+            await this._create(pluginOption, create, job);
+        return {
+            instance: this.create(instance, job || pluginLogger),
+            destroy: async () => {
+                try {
+                    await destroy.call(pluginLogger, instance);
+                } catch (e) {
+                    pluginLogger.warn('Plugin unload error: ', e);
+                }
+            },
+            key: keyValue, config,
+        };
     }
 
-    create(plugin, job) {
-        return new Proxy(plugin, {
+    create(instance, job) {
+        return new Proxy(instance, {
             get(target, p, receiver) {
                 const prop = Reflect.get(target, p, receiver);
                 if (typeof prop === 'function' && !p.startsWith('_')) {
@@ -283,19 +293,19 @@ class PluginLoader {
         });
     }
 
-    async _get(keyValue, pluginOpts, create, logger) {
-        const existing = get(this.loadedPluginInstances, [pluginOpts.type, keyValue]);
+    async _get(keyValue, pluginOption, create, logger) {
+        const existing = get(this.loadedPlugins, [pluginOption.type, keyValue]);
         if (existing) {
             return existing;
         } else {
-            const new_ = await this._create(pluginOpts, create, logger);
-            setWith(this.loadedPluginInstances, [pluginOpts.type, keyValue], new_, Object);
+            const new_ = await this._create(pluginOption, create, logger);
+            setWith(this.loadedPlugins, [pluginOption.type, keyValue], new_, Object);
             return new_;
         }
     }
 
-    async _create(pluginOpts, create, logger) {
-        const pluginLogger = new StoreLogger(this.storeCollection, {plugin: pluginOpts.type}, 'Plugin', [pluginOpts.type]);
+    async _create(pluginOption, create, logger) {
+        const pluginLogger = new StoreLogger(this.storeCollection, {plugin: pluginOption.type}, 'Plugin', [pluginOption.type]);
         let pluginLoader = this;
         if (logger) {
             pluginLoader = new Proxy(this, {
@@ -315,8 +325,8 @@ class PluginLoader {
                 }
             });
         }
-        const plugin = await create.call(pluginLogger, pluginOpts, {pluginLoader});
-        return {plugin, logger: pluginLogger};
+        const instance = await create.call(pluginLogger, pluginOption, {pluginLoader});
+        return {instance, logger: pluginLogger};
     }
 
     async getAllPluginFns() {
@@ -324,18 +334,15 @@ class PluginLoader {
         return this.loadedPluginFns;
     }
 
-    async ensurePluginInstances(plugins, job) {
-        const promises = await Promise.all(Object.entries(plugins).map(
-            ([pluginName, pluginOpts]) => {
-                if (!pluginOpts.type) pluginOpts.type = pluginName;
-                return this.get(pluginOpts, job).then(instance => [pluginName, instance]);
+    async getAll(pluginOpts, job) {
+        const plugins = {};
+        await Promise.all(Object.entries(pluginOpts).map(
+            async ([name, pluginOption]) => {
+                if (!pluginOption.type) pluginOption.type = name;
+                plugins[name] = await this.get(pluginOption, job);
             }
         ));
-        const instances = {};
-        for (const [pluginName, instance] of promises) {
-            instances[pluginName] = instance;
-        }
-        return instances;
+        return plugins;
     };
 
     async load() {
@@ -353,6 +360,14 @@ class PluginLoader {
             }
         }
         this.loaded = true;
+    }
+
+    async unload() {
+        await Promise.all(
+            Object.values(this.loadedPlugins).flatMap(v =>
+                Object.values(v).map(async ({destroy}) => destroy())
+            )
+        );
     }
 
 }

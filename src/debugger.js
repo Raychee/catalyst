@@ -24,7 +24,9 @@ module.exports = class {
         this.options.tasks = this.options.tasks || {};
         this.options.tasks.paths = this.options.tasks.paths || [];
         this.options.plugins = this.options.plugins || {};
-        this.options.plugins.paths = (this.options.plugins.paths || []).map(p => p === 'built-in' ? resolve(__dirname, 'plugins') : p);
+        this.options.plugins.paths = (this.options.plugins.paths || []).map(p =>
+            p.replace(/^\/\//, resolve(__dirname, 'plugins') + '/')
+        );
         this.options.plugins.defaults = this.options.plugins.defaults || {};
         this.options.plugins.config = this.options.plugins.config || {};
         this.options.debugger = this.options.debugger || {};
@@ -36,6 +38,7 @@ module.exports = class {
         this.options.logging.showTimestamp = this.options.logging.showTimestamp || false;
 
         this.taskLoader = undefined;
+        this.pluginLoader = undefined;
 
         Logger.prototype.LOGGING_LEVEL = this.options.logging.level;
         Logger.prototype.SHOW_TIMESTAMP = this.options.logging.showTimestamp;
@@ -61,11 +64,11 @@ module.exports = class {
 
         process.stdout.write('Loading plugins... ');
         const {paths, defaults, config} = this.options.plugins;
-        const pluginLoader = new PluginLoader(paths, storeCollection, defaults, config);
-        await pluginLoader.load();
+        this.pluginLoader = new PluginLoader(paths, storeCollection, defaults, config);
+        await this.pluginLoader.load();
         process.stdout.write('\rLoading plugins... Done.\n');
 
-        this.taskLoader = new TaskLoader(this.options.tasks.paths, undefined, pluginLoader, storeCollection);
+        this.taskLoader = new TaskLoader(this.options.tasks.paths, undefined, this.pluginLoader, storeCollection);
         process.stdout.write('Loading task types... ');
         await this.taskLoader.load();
         process.stdout.write('\rLoading task types... Done.\n');
@@ -97,9 +100,9 @@ module.exports = class {
     async run(job, taskTypeSpec) {
         let taskType;
         if (taskTypeSpec) {
-            const domain = new TaskDomain('', this.taskLoader.pluginLoader, this.taskLoader.storeCollection);
+            const domain = new TaskDomain('', this.pluginLoader, this.taskLoader.storeCollection);
             await domain.load({});
-            taskType = new TaskType(domain, '', undefined, this.taskLoader.pluginLoader, this.taskLoader.storeCollection);
+            taskType = new TaskType(domain, '', undefined, this.pluginLoader, this.taskLoader.storeCollection);
             await taskType.load(taskTypeSpec);
             job = {...DEFAULT_TASK_DOMAIN_CONFIG, job};
         } else {
@@ -117,9 +120,14 @@ module.exports = class {
             return;
         }
         const mongodb = this.mongodb;
+        const pluginLoader = this.pluginLoader;
         this.taskLoader = undefined;
+        this.pluginLoader = undefined;
         this.mongodb = undefined;
         process.stdout.write(`${this.options.name} (debugger) is shutting down.\n`);
+        process.stdout.write('Stopping and unloading components... ');
+        await pluginLoader.unload();
+        process.stdout.write('\rStopping and unloading components... Done.\n');
         process.stdout.write('Closing connections to database... ');
         await mongodb.close();
         process.stdout.write('\rClosing connections to database... Done.\n');

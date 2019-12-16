@@ -24,6 +24,7 @@ module.exports = function ({proxyTypes = {}} = {}) {
             this._init = dedup(Proxies.prototype._init.bind(this));
             this._request = dedup(Proxies.prototype._request.bind(this), {key: null});
             this._get = limit(Proxies.prototype._get.bind(this), 1);
+            this.__syncStore = Proxies.prototype._syncStoreForce.bind(this);
         }
 
         async _init() {
@@ -50,7 +51,7 @@ module.exports = function ({proxyTypes = {}} = {}) {
             this.options = this._makeOptions(options);
             if (minIntervalBetweenStoreUpdate !== this.options.minIntervalBetweenStoreUpdate) {
                 this.__syncStore = dedup(
-                    Proxies.prototype.__syncStore.bind(this),
+                    Proxies.prototype._syncStoreForce.bind(this),
                     {within: this.options.minIntervalBetweenStoreUpdate * 1000}
                 );
             }
@@ -271,7 +272,7 @@ module.exports = function ({proxyTypes = {}} = {}) {
             proxy.identityAssignedAt = undefined;
         }
 
-        async __syncStore() {
+        async _syncStoreForce() {
             let deleteNullProxies = true;
             if (this.stored) {
                 try {
@@ -348,6 +349,9 @@ module.exports = function ({proxyTypes = {}} = {}) {
             const proxies = new Proxies(this, name, type, options, stored);
             await proxies._init();
             return proxies;
+        },
+        async destroy(proxies) {
+            await proxies._syncStoreForce();
         }
     };
 };

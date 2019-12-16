@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.3.9",
+  "version": "0.3.11",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -15,7 +15,7 @@
   },
   "homepage": "https://github.com/Raychee/catalyst#readme",
   "dependencies": {
-    "@raychee/utils": "^0.1.5",
+    "@raychee/utils": "^0.1.6",
     "agenda": "git+https://github.com/hellohupu/agenda.git#feature/catatechcn",
     "apollo-cache-inmemory": "^1.6.2",
     "apollo-client": "^2.6.3",
@@ -31,11 +31,13 @@
     "graphql": "^14.4.2",
     "graphql-augment": "^0.3.29",
     "graphql-tag": "latest",
+    "graphql-tools": "latest",
     "graphql-type-json": "^0.3.0",
     "json-stable-stringify": "^1.0.1",
     "koa": "^2.7.0",
     "lodash": "^4.17.15",
     "mongodb": "^3.2.7",
+    "neo4j-driver": "^4.0.0",
     "node-fetch": "^2.6.0",
     "puppeteer-core": "^1.15.0",
     "request": "^2.88.0",

@@ -87,12 +87,17 @@ class Browser {
                 lock: this.lockIdentityUntilLoaded,
                 ifAbsent: this.createIdentityFn && (async () => {
                     const _id = uuid4();
-                    const browser = await this._newBrowser({identities: undefined, defaultIdentityId: _id});
-                    const {id, ...data} = await this.createIdentityFn.call(logger, browser);
-                    const identity = {id: id || _id, data};
-                    await browser.close();
-                    logger.info('New identity for browser is created: ', identity.id, ' ', identity.data);
-                    return identity;
+                    const {instance, destroy} = await this._newBrowser(
+                        {identities: undefined, defaultIdentityId: _id}
+                    );
+                    try {
+                        const {id, ...data} = await this.createIdentityFn.call(logger, instance);
+                        const identity = {id: id || _id, data};
+                        logger.info('New identity for browser is created: ', identity.id, ' ', identity.data);
+                        return identity;
+                    } finally {
+                        await destroy();
+                    }
                 }),
                 waitForStore: !this.createIdentityFn
             });
@@ -152,7 +157,7 @@ class Browser {
             }
             pageError = error;
             pageErrorCount++;
-            await this.close({closeBrowser: true});
+            await this._close({closeBrowser: true});
             if (pageErrorCount <= this.maxRetryPageCrash) {
                 logger.warn(
                     'Page seems to have crashed and will try reboot (',
@@ -448,7 +453,7 @@ class Browser {
                         if (this.switchProxyOnInvalidIdentity) this.currentProxy = undefined;
                     }
 
-                    await this.close();
+                    await this._close();
                     if (trial <= this.maxRetryIdentities) {
                         await makePage();
                         continue;
@@ -502,13 +507,8 @@ class Browser {
         return makeProxy();
     }
 
-    async close({closeBrowser = true} = {}) {
-        if (this.browser && !this.disconnected) {
-            await this._close({closeBrowser});
-        }
-    }
-
     async _close({closeBrowser = true} = {}) {
+        if (!this.browser || this.disconnected) return;
         const browser = this.browser;
         this.browser = undefined;
         this.disconnected = true;
@@ -521,10 +521,6 @@ class Browser {
         } catch (e) {
             this.logger.warn('There is an error closing browser: ', e);
         }
-    }
-
-    async _onJobDone() {
-        return await this.close();
     }
 
     /**
@@ -576,5 +572,9 @@ module.exports = {
             createIdentityFn, loadIdentityFn, validateIdentityFn, validateProxyFn,
             loadPageStateFn, defaultIdentityId, lockIdentityUntilLoaded
         });
+    },
+
+    async destroy(browser) {
+        await browser._close();
     }
 };
