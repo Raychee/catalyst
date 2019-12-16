@@ -560,10 +560,12 @@ module.exports = {
         {pluginLoader}
     ) {
         if (identities && typeof identities === "object" && identities.constructor === Object) {
-            identities = await pluginLoader.get({type: 'identities', ...identities});
+            const plugin = await pluginLoader.get({type: 'identities', ...identities});
+            identities = plugin.instance;
         }
         if (proxies && typeof proxies === "object" && proxies.constructor === Object) {
-            proxies = await pluginLoader.get({type: 'proxies', ...proxies});
+            const plugin = await pluginLoader.get({type: 'proxies', ...proxies});
+            proxies = plugin.instance;
         }
         return new Browser(this, pluginLoader, connectOpts, {
             identities, proxies, hookedPageMethods,
