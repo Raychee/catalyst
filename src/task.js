@@ -3,7 +3,7 @@ const {UserInputError} = require('apollo-server-koa');
 const {diff} = require('deep-object-diff');
 const uuid = require('uuid/v4');
 
-const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, limit} = require('@raychee/utils');
+const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, limit, shrink} = require('@raychee/utils');
 const {Logger, JobLogger, StoreLogger} = require('./logger');
 const {
     CrawlerError,
@@ -157,29 +157,7 @@ class TaskType {
                             job._loggerSys.retry(`${trialCounter}/${job.config.retry || 0}`);
                             await job._updateTrial({status: 'DELAYED'}, true);
                         }
-                        let delay = 0;
-                        if (job.config.delay > 0) {
-                            const {delayRandomize, retryDelayFactor} = job.config;
-                            const base = job.config.delay * Math.pow(retryDelayFactor, trialCounter);
-                            const delayMin = base * (1 - delayRandomize);
-                            const delayMax = base * (1 + delayRandomize);
-                            delay = random(delayMin, delayMax);
-                            if (delay > 0) {
-                                job._loggerSys.delay(`Delay ${delay} seconds (randomly chosen between ${delayMin} and ${delayMax} seconds)`);
-                            }
-                        }
-                        await job._updateTrial({delay});
-                        if (delay > 0) {
-                            const awakeAt = Date.now() + delay * 1000;
-                            const heartbeat = this.operations ? this.operations.options.heartbeat * 1000 : Number.MAX_SAFE_INTEGER;
-                            let interval = 1;
-                            while (interval > 0) {
-                                interval = awakeAt - Date.now();
-                                if (interval > heartbeat) interval = heartbeat;
-                                await sleep(interval);
-                                job._checkStatusChange();
-                            }
-                        }
+                        await job._delay({}, {trial: trialCounter, updateStatus: true});
                         await job._updateTrial({status: 'RUNNING'});
                         job._loggerSys.start('Job starts.');
                         job._started = Date.now();
@@ -346,24 +324,9 @@ class Job {
     }
 
     async delay(delay, delayRandomize) {
-        if (delay === undefined) delay = this.config.delay;
-        if (delayRandomize === undefined) delayRandomize = this.config.delayRandomize;
-        if (delay > 0) {
-            const base = delay;
-            const delayMin = base * (1 - delayRandomize);
-            const delayMax = base * (1 + delayRandomize);
-            delay = random(delayMin, delayMax);
-
-            const awakeAt = Date.now() + delay * 1000;
-            const heartbeat = this._taskType.operations ? this._taskType.operations.options.heartbeat * 1000 : Number.MAX_SAFE_INTEGER;
-            let interval = 1;
-            while (interval > 0) {
-                interval = awakeAt - Date.now();
-                if (interval > heartbeat) interval = heartbeat;
-                await sleep(interval);
-                this._checkStatusChange();
-            }
-        }
+        const config = {delay, delayRandomize};
+        shrink(config);
+        return await this._delay(config);
     }
 
     cancel(code, ...values) {
@@ -428,6 +391,52 @@ class Job {
 
         if (this._taskType.operations) {
             this._syncStatus().catch(e => console.log(`This should never happen: ${e}`));
+        }
+    }
+
+    async _delay(config, {trial = 0, updateStatus = false} = {}) {
+        function calcDelay() {
+            const {delayRandomize, retryDelayFactor} = config;
+            const base = config.delay * Math.pow(retryDelayFactor, trial);
+            const delayMin = base * (1 - delayRandomize);
+            const delayMax = base * (1 + delayRandomize);
+            return [random(delayMin, delayMax), delayMin, delayMax];
+        }
+
+        config = {...config, ...this.config};
+        let [delay, delayMin, delayMax] = calcDelay();
+        let configDelay = config.delay;
+        if (delay > 0) {
+            this._loggerSys.delay(
+                'Delay ', delay, ' seconds (randomly chosen between ',
+                delayMin, ' and ', delayMax, ' seconds)'
+            );
+        }
+        if (updateStatus) {
+            await this._updateTrial({delay});
+        }
+        if (delay > 0) {
+            const sleepAt = Date.now();
+            const heartbeat = this._taskType.operations ? this._taskType.operations.options.heartbeat * 1000 : Number.MAX_SAFE_INTEGER;
+            while (true) {
+                let interval = sleepAt + delay * 1000 - Date.now();
+                if (interval > heartbeat) interval = heartbeat;
+                if (interval <= 0) break;
+                await sleep(interval);
+                this._checkStatusChange();
+                if (config.delay !== configDelay) {
+                    const [delayNew, delayMinNew, delayMaxNew] = calcDelay();
+                    this._loggerSys.delay(
+                        'Changed delay from ', delay, ' seconds to ', delayNew, ' seconds (randomly chosen between ',
+                        delayMinNew, ' and ', delayMaxNew, ' seconds)'
+                    );
+                    [delay, delayMin, delayMax] = [delayNew, delayMinNew, delayMaxNew];
+                    configDelay = config.delay;
+                    if (updateStatus) {
+                        await this._updateTrial({delay});
+                    }
+                }
+            }
         }
     }
 

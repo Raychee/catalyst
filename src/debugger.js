@@ -6,6 +6,7 @@ const {stringify} = require('@raychee/utils');
 const {Logger} = require('./logger');
 const {TaskLoader, PluginLoader} = require('./loader');
 const {TaskDomain, TaskType} = require('./task');
+const {DEFAULT_TASK_DOMAIN_CONFIG} = require('./config');
 
 
 module.exports = class {
@@ -100,6 +101,7 @@ module.exports = class {
             await domain.load({});
             taskType = new TaskType(domain, '', undefined, this.taskLoader.pluginLoader, this.taskLoader.storeCollection);
             await taskType.load(taskTypeSpec);
+            job = {...DEFAULT_TASK_DOMAIN_CONFIG, job};
         } else {
             const {domain, type} = job;
             taskType = await this.taskLoader.get([domain, type]);
