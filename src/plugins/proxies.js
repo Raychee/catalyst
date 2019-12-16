@@ -1,4 +1,4 @@
-const {get} = require('lodash');
+const {get, isEmpty} = require('lodash');
 
 const {sleep, dedup, limit, requestWithTimeout} = require('@raychee/utils');
 
@@ -40,7 +40,7 @@ module.exports = function ({proxyTypes = {}} = {}) {
             }
         }
 
-        _load({type, options, proxies = {}}) {
+        _load({type, options, proxies = {}} = {}) {
             const minIntervalBetweenStoreUpdate = get(this.options, 'minIntervalBetweenStoreUpdate');
             const requestTimeout = get(this.options, 'requestTimeout');
             // const {
@@ -276,7 +276,12 @@ module.exports = function ({proxyTypes = {}} = {}) {
             let deleteNullProxies = true;
             if (this.stored) {
                 try {
-                    const store = await this.logger.push({[this.name]: {proxies: this.proxies}});
+                    let store;
+                    if (isEmpty(this.proxies)) {
+                        store = await this.logger.pull();
+                    } else {
+                        store = await this.logger.push({[this.name]: {proxies: this.proxies}});
+                    }
                     this._load(store[this.name]);
                 } catch (e) {
                     deleteNullProxies = false;

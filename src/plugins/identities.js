@@ -1,4 +1,4 @@
-const {get} = require('lodash');
+const {get, isEmpty} = require('lodash');
 const uuid4 = require('uuid/v4');
 
 const {dedup} = require('@raychee/utils');
@@ -34,7 +34,7 @@ class Identities {
         }
     }
 
-    _load({options = {}, identities = {}}) {
+    _load({options = {}, identities = {}} = {}) {
         const minIntervalBetweenStoreUpdate = get(this.options, 'minIntervalBetweenStoreUpdate');
         // {
         //     createIdentityFn,
@@ -203,7 +203,12 @@ class Identities {
         let deleteNullIdentities = true;
         if (this.stored) {
             try {
-                const store = await this.logger.push({[this.name]: {identities: this.identities}});
+                let store;
+                if (isEmpty(this.identities)) {
+                    store = await this.logger.pull();
+                } else {
+                    store = await this.logger.push({[this.name]: {identities: this.identities}});
+                }
                 this._load(store[this.name]);
             } catch (e) {
                 deleteNullIdentities = false;
