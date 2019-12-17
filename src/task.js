@@ -124,11 +124,12 @@ class TaskType {
                     if (!jobConfig) {
                         throw new Error('neither jobId nor job is given');
                     }
-                    const job = Job.create(this, agendaJob);
+                    job = Job.create(this, agendaJob);
                     await job._load();
                 } catch (e) {
                     console.error(`System Failure - ${errorToString(e)}`);
                     callback(e);
+                    return;
                 }
 
                 try {
