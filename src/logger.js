@@ -2,11 +2,12 @@ const {isEmpty} = require('lodash');
 
 const {ensureThunkSync, sleep, dedup, flatten, stringifyWith} = require('@raychee/utils');
 const {
-    CrawlerError,
-    CrawlerIntentionalCrash,
-    CrawlerCancellation,
-    CrawlerInterruption,
-    CrawlerTimeout,
+    CatalystError,
+    JobCrash,
+    JobCancellation,
+    JobInterruption,
+    JobTimeout,
+    JobHeartAttack,
 } = require('./error');
 
 
@@ -54,23 +55,27 @@ class Logger {
     }
 
     cancel(code, ...values) {
-        throw new CrawlerCancellation(code, stringifyWith(values, {transform: this.transform}), this);
+        throw new JobCancellation(code, stringifyWith(values, {transform: this.transform}), this);
     }
 
     crash(code, ...values) {
-        throw new CrawlerIntentionalCrash(code, stringifyWith(values, {transform: this.transform}), this);
+        throw new JobCrash(code, stringifyWith(values, {transform: this.transform}), this);
     }
 
     fail(code, ...values) {
-        throw new CrawlerError(code, stringifyWith(values, {transform: this.transform}), this);
+        throw new CatalystError(code, stringifyWith(values, {transform: this.transform}), this);
     }
 
     interrupt(code, ...values) {
-        throw new CrawlerInterruption(code, stringifyWith(values, {transform: this.transform}), this);
+        throw new JobInterruption(code, stringifyWith(values, {transform: this.transform}), this);
     }
 
     timeout(code, ...values) {
-        throw new CrawlerTimeout(code, stringifyWith(values, {transform: this.transform}), this);
+        throw new JobTimeout(code, stringifyWith(values, {transform: this.transform}), this);
+    }
+
+    heartAttack(code, ...values) {
+        throw new JobHeartAttack(code, stringifyWith(values, {transform: this.transform}), this);
     }
 
     _log(log, logCategory, ...values) {
@@ -143,6 +148,12 @@ class JobLogger extends Logger {
     interrupt(...values) {
         if (this._level() <= LOGGING_LEVELS.ERROR) {
             this._log(console.error, 'Interrupt', ...values);
+        }
+    }
+
+    heartAttack(...values) {
+        if (this._level() <= LOGGING_LEVELS.ERROR) {
+            this._log(console.error, 'Heart Attack', ...values);
         }
     }
 

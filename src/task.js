@@ -6,11 +6,12 @@ const uuid = require('uuid/v4');
 const {sleep, safeJSON, random, ensureThunkCall, errorToString, stringifyWith, merge2Level, limit, shrink} = require('@raychee/utils');
 const {Logger, JobLogger, StoreLogger} = require('./logger');
 const {
-    CrawlerError,
-    CrawlerCancellation,
-    CrawlerIntentionalCrash,
-    CrawlerInterruption,
-    CrawlerTimeout
+    CatalystError,
+    JobCancellation,
+    JobCrash,
+    JobInterruption,
+    JobTimeout,
+    JobHeartAttack
 } = require('./error');
 
 
@@ -78,28 +79,30 @@ class TaskType {
 
     toAgendaJobFn() {
         if (!this.agendaFn) {
-            this.agendaFn = async (agendaJob) => {
+            this.agendaFn = async (agendaJob, callback) => {
 
                 async function handleCrawlerError(job, e) {
-                    if (e instanceof CrawlerCancellation) {
+                    if (e instanceof JobCancellation) {
                         job._loggerSys.cancel('Job is canceled: ', e);
                         await job._updateTrial({
                             status: 'CANCELED', code: e.code || '_cancel', message: e.message,
                         }, true);
                         throw e;
-                    } else if (e instanceof CrawlerTimeout) {
+                    } else if (e instanceof JobTimeout) {
                         job._loggerSys.timeout('Job timeout: ', e);
                         await job._updateTrial({
                             status: 'FAILED', code: e.code || '_timeout', message: e.message,
                         }, true);
                         throw e;
-                    } else if (e instanceof CrawlerIntentionalCrash) {
+                    } else if (e instanceof JobCrash) {
                         job._loggerSys.crash('Job crashes on purpose: ', e);
                         await job._updateTrial({
                             status: 'FAILED', code: e.code || '_crash_on_purpose', message: e.message, timeStopped: new Date(),
                         }, true);
                         throw e;
-                    } else if (e instanceof CrawlerInterruption) {
+                    } else if (e instanceof JobInterruption) {
+                        throw e;
+                    } else if (e instanceof JobHeartAttack) {
                         throw e;
                     }
                 }
@@ -109,146 +112,149 @@ class TaskType {
                     jobConfig = agendaJob;
                     agendaJob = undefined;
                 }
-                const job = Job.create(this, agendaJob);
+                let job = undefined;
 
-                for (let trialCounter = 0;
-                     trialCounter <= (job.config.retry || 0);
-                     trialCounter++) {
-
+                try {
+                    if (!jobConfig) {
+                        if (agendaJob) {
+                            const jobId = get(agendaJob, ['attrs', 'data', 'jobId']);
+                            jobConfig = await this.operations.query('Job', [jobId]);
+                        }
+                    }
+                    if (!jobConfig) {
+                        throw new Error('neither jobId nor job is given');
+                    }
+                    const job = Job.create(this, agendaJob);
                     await job._load();
-                    try {
-                        if (trialCounter === 0) {
-                            if (!jobConfig) {
-                                if (agendaJob) {
-                                    const jobId = get(agendaJob, ['attrs', 'data', 'jobId']);
-                                    jobConfig = await this.operations.query('Job', [jobId]);
+                } catch (e) {
+                    console.error(`System Failure - ${errorToString(e)}`);
+                    callback(e);
+                }
+
+                try {
+
+                    for (let trialCounter = 0;
+                         trialCounter <= (job.config.retry || 0);
+                         trialCounter++) {
+
+                        try {
+                            if (trialCounter === 0) {
+                                if (this.jobContextCache) {
+                                    this.jobContextCache.loadBackTo(jobConfig);
                                 }
-                            }
-                            if (!jobConfig) {
-                                throw new Error('System internal error: neither jobId nor job is given');
-                            }
-                            if (this.jobContextCache) {
-                                this.jobContextCache.loadBackTo(jobConfig);
-                            }
-                            const updates = {};
-                            let initContext = jobConfig.initContext;
-                            if (!initContext) {
-                                updates.initContext = initContext = {...jobConfig.context};
-                            }
-                            job._setConfig(jobConfig);
-                            updates.status = 'DELAYED';
-                            updates.trials = job.config.trials || [];
-                            if (updates.trials.length > 0) {
-                                const lastTrial = updates.trials[updates.trials.length - 1];
-                                if (['SUCCESS', 'CANCELED'].indexOf(lastTrial.status) >= 0) {
+                                const updates = {};
+                                let initContext = jobConfig.initContext;
+                                if (!initContext) {
+                                    updates.initContext = initContext = {...jobConfig.context};
+                                }
+                                job._setConfig(jobConfig);
+                                updates.status = 'DELAYED';
+                                updates.trials = job.config.trials || [];
+                                if (updates.trials.length > 0) {
+                                    const lastTrial = updates.trials[updates.trials.length - 1];
+                                    if (['SUCCESS', 'CANCELED'].indexOf(lastTrial.status) >= 0) {
+                                        return;
+                                    }
+                                    updates.trials.pop();
+                                }
+                                updates.trials.push({status: 'DELAYED', context: initContext});
+                                trialCounter = updates.trials.length - 1;
+                                if (trialCounter > (job.config.retry || 0)) {
                                     return;
                                 }
-                                updates.trials.pop();
-                            }
-                            updates.trials.push({status: 'DELAYED', context: initContext});
-                            trialCounter = updates.trials.length - 1;
-                            if (trialCounter > (job.config.retry || 0)) {
-                                return;
-                            }
-                            await job._update(updates);
-                        } else {
-                            job.config.context = {...job.config.context};
-                            job.config.trials.push({});
-                            job._loggerSys.retry(`${trialCounter}/${job.config.retry || 0}`);
-                            await job._updateTrial({status: 'DELAYED'}, true);
-                        }
-                        await job._delay({}, {trial: trialCounter, updateStatus: true});
-                        await job._updateTrial({status: 'RUNNING'});
-                        job._loggerSys.start('Job starts.');
-                        job._started = Date.now();
-                        await this.run.call(job, job.config.params, job.config.context, this.store);
-                        await job._updateTrial({status: 'SUCCESS'}, true);
-                        job._loggerSys.complete('Job completes.');
-
-                        break;
-
-                    } catch (e) {
-                        if (e instanceof CrawlerError) {
-                            await handleCrawlerError(job, e);
-                            await job._updateTrial({
-                                status: 'FAILED', code: e.code || '_failed', message: e.message,
-                            }, true);
-                            job._loggerSys.fail('Job fails: ', e);
-                            if (job._started) {
-                                try {
-                                    await this.failed.call(job, e.code, e.message, job.config.params, job.config.context, this.store);
-                                } catch (ee) {
-                                    await handleCrawlerError(job, ee);
-                                    await job._updateTrial({
-                                        status: 'FAILED', code: '_crash_failed', message: errorToString(e), timeStopped: new Date(),
-                                    }, true);
-                                    job._loggerSys.crash('Job crashes in failed(): ', ee);
-                                    throw ee;
-                                }
-                            }
-                        } else {
-                            let catchMessages = undefined;
-                            if (job._started) {
-                                try {
-                                    catchMessages = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
-                                } catch (ee) {
-                                    await handleCrawlerError(job, ee);
-                                    await job._updateTrial({
-                                        status: 'FAILED', code: '_crash_catch', message: errorToString(e), timeStopped: new Date(),
-                                    }, true);
-                                    job._loggerSys.crash('Job crashes in catch(): ', ee);
-                                    throw ee;
-                                }
-                            }
-                            if (catchMessages) {
-                                if (!Array.isArray(catchMessages)) {
-                                    catchMessages = [catchMessages];
-                                }
-                                await job._updateTrial({
-                                    status: 'FAILED', code: e.code || '_catch', message: stringifyWith(catchMessages),
-                                }, true);
-                                job._loggerSys.catch('Job fails by catching: ', ...catchMessages);
+                                await job._update(updates);
                             } else {
-                                await job._updateTrial({
-                                    status: 'FAILED', code: '_crash_run', message: errorToString(e), timeStopped: new Date(),
-                                }, true);
-                                job._loggerSys.crash('Job crashes in run(): ', e);
-                                throw e;
+                                job.config.context = {...job.config.context};
+                                job.config.trials.push({});
+                                job._loggerSys.retry(`${trialCounter}/${job.config.retry || 0}`);
+                                await job._updateTrial({status: 'DELAYED'}, true);
                             }
-                        }
+                            await job._delay({}, {trial: trialCounter, updateStatus: true});
+                            await job._updateTrial({status: 'RUNNING'});
+                            job._loggerSys.start('Job starts.');
+                            job._started = Date.now();
+                            await this.run.call(job, job.config.params, job.config.context, this.store);
+                            await job._updateTrial({status: 'SUCCESS'}, true);
+                            job._loggerSys.complete('Job completes.');
 
-                    } finally {
-                        if (!job._interrupted && !job._timeout && job._started) {
-                            try {
-                                await this.final.call(job, job.config.params, job.config.context, this.store);
+                            break;
 
-                                // the following is a hack to agenda which tries to solve a bug that
-                                // disabling an agenda job during its execution will end up resetting the "disabled" flag
-                                // back to "false" when the execution is over. hard refresh the job to make it
-                                // behave as expected.
-                                // if (agendaJob.attrs._id) {
-                                //     const [agendaJobFromDb] = await agendaJob.agenda.jobs({_id: agendaJob.attrs._id});
-                                //     agendaJob.attrs = {
-                                //         ...agendaJobFromDb.attrs,
-                                //         nextRunAt: agendaJob.attrs.nextRunAt,
-                                //         type: agendaJob.attrs.type
-                                //     };
-                                // }
-
-                            } catch (e) {
+                        } catch (e) {
+                            if (e instanceof CatalystError) {
                                 await handleCrawlerError(job, e);
                                 await job._updateTrial({
-                                    status: 'FAILED', code: e.code || '_crash_final', message: errorToString(e), timeStopped: new Date(),
+                                    status: 'FAILED', code: e.code || '_failed', message: e.message,
                                 }, true);
-                                job._loggerSys.crash('Job crashes in final(): ', e);
-                                throw e;
+                                job._loggerSys.fail('Job fails: ', e);
+                                if (job._started) {
+                                    try {
+                                        await this.failed.call(job, e.code, e.message, job.config.params, job.config.context, this.store);
+                                    } catch (ee) {
+                                        await handleCrawlerError(job, ee);
+                                        await job._updateTrial({
+                                            status: 'FAILED', code: '_crash_failed', message: errorToString(e), timeStopped: new Date(),
+                                        }, true);
+                                        job._loggerSys.crash('Job crashes in failed(): ', ee);
+                                        throw ee;
+                                    }
+                                }
+                            } else {
+                                let catchMessages = undefined;
+                                if (job._started) {
+                                    try {
+                                        catchMessages = await this.catch.call(job, e, job.config.params, job.config.context, this.store);
+                                    } catch (ee) {
+                                        await handleCrawlerError(job, ee);
+                                        await job._updateTrial({
+                                            status: 'FAILED', code: '_crash_catch', message: errorToString(e), timeStopped: new Date(),
+                                        }, true);
+                                        job._loggerSys.crash('Job crashes in catch(): ', ee);
+                                        throw ee;
+                                    }
+                                }
+                                if (catchMessages) {
+                                    if (!Array.isArray(catchMessages)) {
+                                        catchMessages = [catchMessages];
+                                    }
+                                    await job._updateTrial({
+                                        status: 'FAILED', code: e.code || '_catch', message: stringifyWith(catchMessages),
+                                    }, true);
+                                    job._loggerSys.catch('Job fails by catching: ', ...catchMessages);
+                                } else {
+                                    await job._updateTrial({
+                                        status: 'FAILED', code: '_crash_run', message: errorToString(e), timeStopped: new Date(),
+                                    }, true);
+                                    job._loggerSys.crash('Job crashes in run(): ', e);
+                                    throw e;
+                                }
                             }
+
+                        } finally {
+                            if (!job._interrupted && !job._timeout && !job._heartAttack && job._started) {
+                                try {
+                                    await this.final.call(job, job.config.params, job.config.context, this.store);
+                                } catch (e) {
+                                    await handleCrawlerError(job, e);
+                                    await job._updateTrial({
+                                        status: 'FAILED', code: e.code || '_crash_final', message: errorToString(e), timeStopped: new Date(),
+                                    }, true);
+                                    job._loggerSys.crash('Job crashes in final(): ', e);
+                                    throw e;
+                                }
+                            }
+                            if (this.jobContextCache) {
+                                this.jobContextCache.clearCache(job.config);
+                            }
+                            await job._unload();
                         }
-                        if (this.jobContextCache) {
-                            this.jobContextCache.clearCache(job.config);
-                        }
-                        await job._unload();
                     }
+
+                    callback();
+                } catch (e) {
+                    if (e instanceof JobHeartAttack) {
+                        return;
+                    }
+                    callback(e);
                 }
             }
         }
@@ -272,6 +278,7 @@ class Job {
         this._done = false;
         this._timeout = undefined;
         this._interrupted = false;
+        this._heartAttack = false;
         this._canceled = undefined;
 
         this._update = limit(Job.prototype._update.bind(this), 1);
@@ -565,9 +572,22 @@ class Job {
         if (this._timeout) {
             this._logger.timeout('_timeout', 'Job execution time exceeds ', this.config.timeout, ' seconds and is terminated.');
         }
+        if (this._heartAttack) {
+            this._loggerSys.heartAttack(
+                'Job\'s heartbeat is slower than ',
+                this._taskType.operations.options.heartAttack,
+                ' seconds and will be considered dead. A new job will be / is being spawned and replace this job.'
+            );
+            this._logger.heartAttack(
+                '_heart_attack', 'Job\'s heartbeat is slower than ',
+                this._taskType.operations.options.heartAttack,
+                ' seconds and will be considered dead. A new job will be / is being spawned and replace this job.'
+            );
+        }
     }
 
     async _syncStatus() {
+        let lastTouchedAt = undefined;
         while (!this._done && !this._interrupted && !this._canceled && !this._timeout) {
             await sleep(this._taskType.operations.options.heartbeat * 1000);
             if (!this.config.id) continue;
@@ -582,7 +602,13 @@ class Job {
                     this._canceled = '_cancel_disabled';
                 }
                 if (this._agendaJob) {
-                    await this._agendaJob.touch();
+                    const now = Date.now();
+                    if (now - lastTouchedAt > this._taskType.operations.options.heartAttack * 1000) {
+                        this._heartAttack = true;
+                    } else {
+                        lastTouchedAt = now;
+                        await this._agendaJob.touch();
+                    }
                 }
                 if (this.config.timeout > 0 && this._started < Date.now() - this.config.timeout * 1000) {
                     this._timeout = true;

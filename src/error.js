@@ -1,42 +1,52 @@
-class CrawlerError extends Error {
-
+class CatalystError extends Error {
     constructor(code, message) {
         super(message);
-        this.name = 'CrawlerError';
+        this.name = 'CatalystError';
         this.code = code;
     }
-
 }
 
-class CrawlerIntentionalCrash extends CrawlerError {
+class JobCrash extends CatalystError {
     constructor(code, message) {
         super(code, message);
+        this.name = 'JobCrash';
     }
 }
 
-class CrawlerCancellation extends CrawlerError {
+class JobCancellation extends CatalystError {
     constructor(code, message) {
         super(code, message);
+        this.name = 'JobCancellation';
     }
 }
 
-class CrawlerInterruption extends CrawlerError {
+class JobInterruption extends CatalystError {
     constructor(code, message) {
         super(code, message);
+        this.name = 'JobInterruption';
     }
 }
 
 
-class CrawlerTimeout extends CrawlerError {
+class JobTimeout extends CatalystError {
     constructor(code, message) {
         super(code, message);
+        this.name = 'JobTimeout';
+    }
+}
+
+class JobHeartAttack extends CatalystError {
+    constructor(code, message) {
+        super(code, message);
+        this.name = 'JobHeartAttack';
     }
 }
 
 module.exports = {
-    CrawlerError,
-    CrawlerIntentionalCrash,
-    CrawlerCancellation,
-    CrawlerInterruption,
-    CrawlerTimeout,
+    CatalystError,
+    JobCrash,
+    JobCancellation,
+    JobInterruption,
+    JobTimeout,
+    JobHeartAttack,
 };
