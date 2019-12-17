@@ -340,12 +340,10 @@ class PluginLoader {
 
     async getAll(pluginOpts, job) {
         const plugins = {};
-        await Promise.all(Object.entries(pluginOpts).map(
-            async ([name, pluginOption]) => {
-                if (!pluginOption.type) pluginOption.type = name;
-                plugins[name] = await this.get(pluginOption, job);
-            }
-        ));
+        for (const [name, pluginOption] of Object.entries(pluginOpts)) {
+            if (!pluginOption.type) pluginOption.type = name;
+            plugins[name] = await this.get(pluginOption, job);
+        }
         return plugins;
     };
 
