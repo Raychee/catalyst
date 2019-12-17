@@ -245,7 +245,7 @@ class PluginLoader {
         this.defaultPlugins = defaultPlugins;
         this.metaConfigs = metaConfigs;
 
-        this._get = limit(PluginLoader.prototype._get, 1);
+        this._get = limit(PluginLoader.prototype._get.bind(this), 1);
     }
 
     async get(pluginOption, job) {
