@@ -145,12 +145,6 @@ class TaskLoader {
         }
         this.loaded = true;
         if (verbose) process.stdout.write('\rLoading task types... Done.\n');
-
-        if (this.operations) {
-            if (verbose) process.stdout.write('Loading task configs... ');
-            await this.syncConfigs({verbose});
-            if (verbose) process.stdout.write('\rLoading task configs... Done.\n');
-        }
     }
 
     async syncConfigs() {
