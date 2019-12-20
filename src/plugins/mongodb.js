@@ -125,7 +125,7 @@ class MongoDB {
         );
     }
 
-    updateMany(logger, filter, update, options) {
+    updateMany(logger, filter, update, options = {}) {
         logger = logger || this.logger;
         const {debug, ...opts} = options;
         if (debug || this.options.otherOptions.debug) {
@@ -137,7 +137,7 @@ class MongoDB {
         );
     }
 
-    deleteMany(logger, filter, options) {
+    deleteMany(logger, filter, options = {}) {
         logger = logger || this.logger;
         const {debug, ...opts} = options;
         if (debug || this.options.otherOptions.debug) {
@@ -149,7 +149,7 @@ class MongoDB {
         );
     }
 
-    drop(logger, options) {
+    drop(logger, options = {}) {
         logger = logger || this.logger;
         const {debug, ...opts} = options;
         if (debug || this.options.otherOptions.debug) {
@@ -167,7 +167,7 @@ class MongoDB {
         );
     }
 
-    createIndexes(logger, indexSpecs, options) {
+    createIndexes(logger, indexSpecs, options = {}) {
         logger = logger || this.logger;
         const {debug, ...opts} = options;
         if (debug || this.options.otherOptions.debug) {
