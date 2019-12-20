@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -36,7 +36,7 @@
     "json-stable-stringify": "^1.0.1",
     "koa": "^2.7.0",
     "lodash": "^4.17.15",
-    "mongodb": "^3.2.7",
+    "mongodb": "^3.3.5",
     "neo4j-driver": "^4.0.0",
     "node-fetch": "^2.6.0",
     "puppeteer-core": "^1.15.0",

@@ -1,5 +1,5 @@
 const {GraphQLJSON, GraphQLJSONObject} = require('graphql-type-json');
-const {AugmentedArgResolver, GraphQLDateTime, UserInputError} = require('graphql-augment');
+const {AugmentedArgResolver, GraphQLDateTime, UserInputError, getNamedType} = require('graphql-augment');
 
 const {TYPES} = require('../config');
 
@@ -29,6 +29,9 @@ function authorize(payload, auth, type, field, mode, args) {
     return message;
 }
 
+/**
+ * @param context {{operations: Operations}}
+ */
 function queryArgResolverGenerator(context) {
 
     function getPrefix(type) {
@@ -102,6 +105,9 @@ function queryArgResolverGenerator(context) {
 }
 
 
+/**
+ * @param context {{operations: Operations}}
+ */
 function mutationArgResolverGenerator(context) {
 
     const resolveFns = {

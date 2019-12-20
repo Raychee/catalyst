@@ -69,9 +69,7 @@ module.exports = class {
         process.stdout.write('\rLoading plugins... Done.\n');
 
         this.taskLoader = new TaskLoader(this.options.tasks.paths, undefined, this.pluginLoader, storeCollection);
-        process.stdout.write('Loading task types... ');
-        await this.taskLoader.load();
-        process.stdout.write('\rLoading task types... Done.\n');
+        await this.taskLoader.load({verbose: true});
 
         process.stdout.write(`${this.options.name} (debugger) is started.\n`);
 

@@ -1,3 +1,22 @@
+/**
+ * @typedef PluginEntryConfig
+ * @type {object}
+ * @property {boolean} destroyOnJobDone
+ */
+/**
+ * @callback PluginDestroyFn
+ */
+/**
+ * @typedef PluginEntry
+ * @type {object}
+ * @property {object} instance - the plugin instance object from create()
+ * @property {PluginEntryConfig} config
+ * @property {string} key
+ * @property {StoreLogger} logger
+ * @property {PluginDestroyFn} destroy
+ */
+
+
 const path = require('path');
 
 const {get, setWith} = require('lodash');
@@ -25,8 +44,8 @@ class TaskLoader {
         this.loadedTaskDomains = {};
         this.loadedTaskTypes = {};
 
-        this.syncConfigInterval = 60;
-        this._syncConfigs = dedup(TaskLoader.prototype._syncConfigs.bind(this), {within: this.syncConfigInterval * 1000});
+        this.syncInterval = 60;
+        this._started = false;
     }
 
     async getAllAgendas() {
@@ -56,7 +75,7 @@ class TaskLoader {
         return (await this.getAllTaskTypes())[taskTypeFields.join('.')];
     }
 
-    async load({syncConfigsPeriodically = false} = {}) {
+    async load({verbose = false} = {}) {
         this.loadedTaskDomains = {};
         this.loadedTaskTypes = {};
         if (!this.taskAgenda && this.newAgenda) {
@@ -86,6 +105,7 @@ class TaskLoader {
                 await this.operations.scheduleJob(jobConfig);
             });
         }
+        if (verbose) process.stdout.write('Loading task domains... ');
         for await (let scanned of this._scan()) {
             const [taskFilePath, domainName, taskFileName] = scanned;
             let domain = this.loadedTaskDomains[domainName];
@@ -102,6 +122,8 @@ class TaskLoader {
             const taskDomainSpec = require(taskFilePath);
             await domain.load(taskDomainSpec);
         }
+        if (verbose) process.stdout.write('\rLoading task domains... Done.\n');
+        if (verbose) process.stdout.write('Loading task types... ');
         for await (let scanned of this._scan()) {
             const [taskFilePath, ...taskTypeFields] = scanned;
             const [domainName, ...taskTypeNameFields] = taskTypeFields;
@@ -122,49 +144,40 @@ class TaskLoader {
             this.loadedTaskTypes[taskTypeFullName] = taskType;
         }
         this.loaded = true;
+        if (verbose) process.stdout.write('\rLoading task types... Done.\n');
 
         if (this.operations) {
-            await this._syncConfigs();
-            if (syncConfigsPeriodically) {
-                (async () => {
-                    while (true) {
-                        await sleep(this.syncConfigInterval * 1000);
-                        try {
-                            await this._syncConfigs();
-                        } catch (e) {
-                            console.error('Refreshing configs encounters an error: ' + e);
-                        }
-                    }
-                })();
-            }
+            if (verbose) process.stdout.write('Loading task configs... ');
+            await this.syncConfigs({verbose});
+            if (verbose) process.stdout.write('\rLoading task configs... Done.\n');
         }
     }
 
-    async _syncConfigs() {
+    async syncConfigs() {
         const dataloaders = {};
         await this.operations.updateTaskDomainConfigs(dataloaders);
         await this.operations.updateTaskTypeConfigs(undefined, dataloaders);
     }
 
-    async start() {
-        process.stdout.write('Starting agenda... ');
-        await this.taskAgenda.start();
-        process.stdout.write('\rStarting agenda... Done.\n');
-        process.stdout.write('Re-scheduling interrupted jobs... ');
-        const now = new Date();
+    async rescheduleJobs() {
         for (const agenda of Object.values(this.agendas)) {
             while (true) {
                 const agendaJobs = await agenda.jobs({
                     type: 'normal', lastFinishedAt: null, lockedAt: null, nextRunAt: null, disabled: {$ne: true}
                 }, {}, 200);
-                if (agendaJobs.length > 0) {
-                    await Promise.all(agendaJobs.map(async agendaJob => {
-                        const {jobId} = agendaJob.attrs.data;
-                        if (jobId) {
-                            await this.operations.upsert('Job', {id: jobId, status: 'PENDING'}, true, undefined, {id: jobId});
-                        }
+                if (agendaJobs.length > 0 && this._started) {
+                    console.log(`### reschedule agenda jobs: ${agendaJobs.length}`);
+                    const now = new Date();
+                    await Promise.all(agendaJobs.flatMap(agendaJob => {
                         agendaJob.schedule(now);
-                        await agendaJob.save();
+                        const {jobId} = agendaJob.attrs.data;
+                        const promises = [agendaJob.save()];
+                        if (jobId) {
+                            promises.push(this.operations.upsert(
+                                'Job', {id: jobId, status: 'PENDING'}, true, undefined, {id: jobId}
+                            ));
+                        }
+                        return promises;
                     }));
                 } else {
                     break;
@@ -173,42 +186,64 @@ class TaskLoader {
         }
         while (true) {
             const jobs = await this.operations.query('Job', {status: 'INTERRUPTED'}, {limit: 200});
-            if (jobs.length > 0) {
-                await Promise.all(jobs.map(({id}) => this.operations.scheduleJob({id, status: 'PENDING'})));
+            if (jobs.length > 0 && this._started) {
+                await Promise.all(jobs.map(({id}) =>
+                    this.operations.scheduleJob({id, status: 'PENDING'}))
+                );
             } else {
                 break;
             }
         }
-        process.stdout.write('\rRe-scheduling interrupted jobs... Done.\n');
-        await this._start();
     }
 
-    async stop() {
+    async start({verbose = false} = {}) {
+        this._started = true;
+        if (this.operations) {
+            if (verbose) process.stdout.write('Loading task configs... ');
+            await this.syncConfigs();
+            if (verbose) process.stdout.write('\rLoading task configs... Done.\n');
+            if (verbose) process.stdout.write('Re-scheduling interrupted jobs... ');
+            await this.rescheduleJobs();
+            if (verbose) process.stdout.write('\rRe-scheduling interrupted jobs... Done.\n');
+        }
+        if (verbose) process.stdout.write('Starting agenda... ');
+        await this.taskAgenda.start();
+        for (const agenda of Object.values(this.agendas)) {
+            await agenda.start();
+        }
+        if (verbose) process.stdout.write('\rStarting agenda... Done.\n');
+        if (this.operations) {
+            (async () => {
+                while (this._started) {
+                    await sleep(this.syncInterval * 1000);
+                    try {
+                        await this.syncConfigs();
+                        await this.rescheduleJobs();
+                    } catch (e) {
+                        console.error('Refreshing configs encounters an error: ' + e);
+                    }
+                }
+            })().catch(e => console.error(`This should never happen: ${e}`));
+        }
+    }
+
+    async stop({verbose = false} = {}) {
+        this._started = false;
         await this.taskAgenda.stop();
         const runningJobIds = [];
         for (const agenda of Object.values(this.agendas)) {
             runningJobIds.push(...agenda._runningJobs.map(j => j.attrs.data.jobId).filter(i => i));
         }
-        process.stdout.write('Stopping agenda...');
-        await this._stop();
-        process.stdout.write('\rStopping agenda... Done.\n');
-        process.stdout.write('Marking running jobs as interrupted...');
-        await this.operations.mongodb.collection('Job').updateMany(
-            {id: {$in: runningJobIds}}, {$set: {status: 'INTERRUPTED'}}
-        );
-        process.stdout.write('\rMarking running jobs as interrupted... Done.\n');
-    }
-
-    async _start() {
-        for (const agenda of Object.values(this.agendas)) {
-            await agenda.start();
-        }
-    }
-
-    async _stop() {
+        if (verbose) process.stdout.write('Stopping agenda...');
         for (const agenda of Object.values(this.agendas)) {
             await agenda.stop();
         }
+        if (verbose) process.stdout.write('\rStopping agenda... Done.\n');
+        if (verbose) process.stdout.write('Marking running jobs as interrupted...');
+        await this.operations.mongodb.collection('Job').updateMany(
+            {id: {$in: runningJobIds}}, {$set: {status: 'INTERRUPTED'}}
+        );
+        if (verbose) process.stdout.write('\rMarking running jobs as interrupted... Done.\n');
     }
 
     async *_scan() {
@@ -298,7 +333,11 @@ class PluginLoader {
         }
     }
 
-    async _create(pluginOption, {create, destroy, config}, logger) {
+    /**
+     * @return {Promise<PluginEntry>}
+     * @private
+     */
+    async _create(pluginOption, {create, destroy, config = {}}, logger) {
         const pluginLogger = new StoreLogger(this.storeCollection, {plugin: pluginOption.type}, 'Plugin', [pluginOption.type]);
         let pluginLoader = this;
         if (logger) {
@@ -333,6 +372,9 @@ class PluginLoader {
         };
     }
 
+    /**
+     * @returns {Promise<Object.<string, PluginEntry>>}
+     */
     async getAllPluginFns() {
         if (!this.loaded) await this.load();
         return this.loadedPluginFns;

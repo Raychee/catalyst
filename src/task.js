@@ -452,7 +452,7 @@ class Job {
     async _unload() {
         this._done = true;
         await Promise.all(Object.values(this._plugins).map(
-            async ({key, destroy, config}) => {
+            async ({key, destroy, config = {}}) => {
                 if (!key || config.destroyOnJobDone) {
                     await destroy();
                 }

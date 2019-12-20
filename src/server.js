@@ -73,9 +73,10 @@ module.exports = class {
             '_task'
         );
         operations.taskLoader = taskLoader;
-        process.stdout.write('Loading task types... ');
-        await taskLoader.load();
-        process.stdout.write('\rLoading task types... Done.\n');
+        await taskLoader.load({verbose: true});
+        process.stdout.write('Loading task configs... ');
+        await taskLoader.syncConfigs();
+        process.stdout.write('\rLoading task configs... Done.\n');
 
         const typeDefs = fs.readFileSync(path.join(__dirname, 'service', 'schema.graphql'))
             .toString('utf-8')

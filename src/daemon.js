@@ -13,6 +13,7 @@ const Operations = require('./operations');
 
 
 module.exports = class {
+
     constructor(options) {
         this.options = options || {};
         this.options.name = this.options.name || 'Catalyst';
@@ -41,7 +42,9 @@ module.exports = class {
         this.options.logging.level = this.options.logging.level || 'INFO';
         this.options.logging.showTimestamp = this.options.logging.showTimestamp || false;
 
+        /** @type {TaskLoader} */
         this.taskLoader = undefined;
+        /** @type {PluginLoader} */
         this.pluginLoader = undefined;
         this.mongodb = undefined;
 
@@ -73,7 +76,6 @@ module.exports = class {
         await this.pluginLoader.load();
         process.stdout.write('\rLoading plugins... Done.\n');
 
-        process.stdout.write('Loading task types... ');
         const {paths: taskPaths, ...taskOptions} = this.options.tasks;
         const jobContextCache = new JobContextCache();
         const operations = new Operations(this.mongodb.db(service), undefined, jobContextCache, taskOptions);
@@ -85,8 +87,7 @@ module.exports = class {
             '_task',
         );
         operations.taskLoader = this.taskLoader;
-        await this.taskLoader.load({syncConfigsPeriodically: true});
-        process.stdout.write('\rLoading task types... Done.\n');
+        await this.taskLoader.load({verbose: true});
 
         process.stdout.write('Ensuring database indexes... ');
         for (const agenda of Object.values(await this.taskLoader.getAllAgendas())) {
@@ -98,7 +99,7 @@ module.exports = class {
         }
         process.stdout.write('\rEnsuring database indexes... Done.\n');
 
-        await this.taskLoader.start();
+        await this.taskLoader.start({verbose: true});
 
         process.stdout.write(`${this.options.name} (daemon) is started.\n`);
 
@@ -117,10 +118,10 @@ module.exports = class {
         this.pluginLoader = undefined;
         this.mongodb = undefined;
         process.stdout.write(`${this.options.name} (daemon) is shutting down.\n`);
-        process.stdout.write('Stopping and unloading components... ');
-        await taskLoader.stop();
+        await taskLoader.stop({verbose: true});
+        process.stdout.write('Unloading plugins... ');
         await pluginLoader.unload();
-        process.stdout.write('\rStopping and unloading components... Done.\n');
+        process.stdout.write('\rUnloading plugins... Done.\n');
         if (this.options.daemon.waitBeforeStop > 0) {
             process.stdout.write(`Wait ${this.options.daemon.waitBeforeStop} secs for running jobs to stop. \n`);
             await sleep(this.options.daemon.waitBeforeStop * 1000);
