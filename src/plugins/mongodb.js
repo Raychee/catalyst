@@ -12,7 +12,7 @@ module.exports = {
             connectionOptions = {useNewUrlParser: true, useUnifiedTopology: true},
             queryOptions = {},
             aggregationOptions = {allowDiskUse: true},
-            otherOptions = {},
+            otherOptions = {debug: false, showProgressEvery: undefined},
         }
     ) {
         return {host, port, user, password, db, collection, connectionOptions, queryOptions, aggregationOptions, otherOptions};
@@ -24,7 +24,7 @@ module.exports = {
             connectionOptions = {useNewUrlParser: true, useUnifiedTopology: true},
             queryOptions = {},
             aggregationOptions = {allowDiskUse: true},
-            otherOptions = {},
+            otherOptions = {debug: false, showProgressEvery: undefined},
         },
         {pluginLoader}
     ) {
@@ -76,53 +76,88 @@ class MongoDB {
     aggregate(logger, pipeline, options) {
         logger = logger || this.logger;
         options = {...this.options.aggregationOptions, ...options};
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').aggregate(', pipeline, ', ', opts, ');');
+        }
         return this._handleCursor(
-            logger, this._connect(logger).then(coll => coll.aggregate(pipeline, options))
+            logger, this._connect(logger).then(coll => coll.aggregate(pipeline, opts))
         );
     }
 
     find(logger, query, options) {
         logger = logger || this.logger;
         options = {...this.options.queryOptions, ...options};
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').find(', query, ', ', opts, ');');
+        }
         return this._handleCursor(
-            logger, this._connect(logger).then(coll => coll.find(query, options))
+            logger, this._connect(logger).then(coll => coll.find(query, opts))
         );
     }
 
     findOne(logger, query, options) {
         logger = logger || this.logger;
         options = {...this.options.queryOptions, ...options};
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').findOne(', query, ', ', opts, ');');
+        }
         return this._handlePromise(
-            logger, this._connect(logger).then(coll => coll.findOne(query, options))
+            logger, this._connect(logger).then(coll => coll.findOne(query, opts))
         );
     }
 
     countDocuments(logger, query, options) {
         logger = logger || this.logger;
         options = {...this.options.queryOptions, ...options};
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').countDocuments(', query, ', ', opts, ');');
+        }
         return this._handlePromise(
-            logger, this._connect(logger).then(coll => coll.countDocuments(query, options))
+            logger, this._connect(logger).then(coll => coll.countDocuments(query, opts))
         );
     }
 
     updateMany(logger, filter, update, options) {
         logger = logger || this.logger;
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').updateMany(', filter, ', ', update, ', ', opts, ');');
+        }
         return this._handlePromise(
-            logger, this._connect(logger).then(coll => coll.updateMany(filter, update, options))
+            logger, this._connect(logger).then(coll => coll.updateMany(filter, update, opts))
         );
     }
 
     deleteMany(logger, filter, options) {
         logger = logger || this.logger;
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').deleteMany(', filter, ', ', opts, ');');
+        }
         return this._handlePromise(
-            logger, this._connect(logger).then(coll => coll.deleteMany(filter, options))
+            logger, this._connect(logger).then(coll => coll.deleteMany(filter, opts))
         );
     }
 
     drop(logger, options) {
         logger = logger || this.logger;
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').drop(', opts, ');');
+        }
         return this._handlePromise(
-            logger, this._connect(logger).then(coll => coll.drop(options).catch(e => {
+            logger, this._connect(logger).then(coll => coll.drop(opts).catch(e => {
                 if (e.message.match(/ns not found/)) {
                     return null;
                 } else {
@@ -134,8 +169,13 @@ class MongoDB {
 
     createIndexes(logger, indexSpecs, options) {
         logger = logger || this.logger;
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').createIndexes(', indexSpecs, ', ', opts, ');');
+        }
         return this._handlePromise(
-            logger, this._connect(logger).then(coll => coll.createIndexes(indexSpecs, options))
+            logger, this._connect(logger).then(coll => coll.createIndexes(indexSpecs, opts))
         );
     }
 

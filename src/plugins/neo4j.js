@@ -7,14 +7,14 @@ const {replaceAll} = require('@raychee/utils');
 module.exports = {
     key({
             host, port, user, password, connectionOptions,
-            otherOptions = {}
+            otherOptions = {debug: false, showProgressEvery: undefined}
         } = {}) {
         return {host, port, user, password, connectionOptions, otherOptions};
     },
     create(
         {
             host, port, user, password, connectionOptions,
-            otherOptions = {}
+            otherOptions = {debug: false, showProgressEvery: undefined}
         } = {}
     ) {
         const driver = neo4jDriver(
@@ -82,8 +82,10 @@ class Neo4J {
             }
         };
 
-        // logger.debug(cypher);
-        // logger.debug(params);
+        if (this.options.debug) {
+            logger.debug(cypher);
+            logger.debug(params);
+        }
         const result = session.run(cypher, this.ensureCypherValue(logger, params));
         return {
 
