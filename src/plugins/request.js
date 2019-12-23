@@ -93,10 +93,10 @@ module.exports = {
         }
 
         if (smartError) {
-            req = function (req, logger, options) {
+            req = async function (req, logger, options) {
                 logger = logger || this;
                 try {
-                    return req(logger, options);
+                    return await req(logger, options);
                 } catch (e) {
                     if (e.statusCode) {
                         if (e.statusCode >= 400 && e.statusCode < 500) {
