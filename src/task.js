@@ -112,6 +112,7 @@ class TaskType {
                     jobConfig = agendaJob;
                     agendaJob = undefined;
                 }
+                /** @type {Job} */
                 let job = undefined;
 
                 try {
@@ -152,17 +153,17 @@ class TaskType {
                                 updates.status = 'DELAYED';
                                 updates.trials = job.config.trials || [];
                                 if (updates.trials.length > 0) {
-                                    const lastTrial = updates.trials[updates.trials.length - 1];
-                                    if (['SUCCESS', 'CANCELED'].indexOf(lastTrial.status) >= 0) {
+                                    const {status, timeStopped} = updates.trials.pop();
+                                    if (['SUCCESS', 'CANCELED'].indexOf(status) >= 0) {
+                                        await job._update({status, timeStopped});
                                         return;
                                     }
-                                    updates.trials.pop();
                                 }
-                                updates.trials.push({status: 'DELAYED', context: initContext});
-                                trialCounter = updates.trials.length - 1;
+                                trialCounter = updates.trials.length;
                                 if (trialCounter > (job.config.retry || 0)) {
                                     return;
                                 }
+                                updates.trials.push({status: 'DELAYED', context: initContext});
                                 await job._update(updates);
                             } else {
                                 job.config.context = {...job.config.context};
@@ -266,6 +267,10 @@ class TaskType {
 
 class Job {
 
+    /**
+     * @param taskType {TaskType}
+     * @param agendaJob
+     */
     constructor(taskType, agendaJob) {
         this.config = {};
         this._taskType = taskType;
