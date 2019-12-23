@@ -12,10 +12,11 @@ module.exports = {
             connectionOptions = {useNewUrlParser: true, useUnifiedTopology: true},
             queryOptions = {},
             aggregationOptions = {allowDiskUse: true},
+            mapReduceOptions = {},
             otherOptions = {debug: false, showProgressEvery: undefined},
         }
     ) {
-        return {host, port, user, password, db, collection, connectionOptions, queryOptions, aggregationOptions, otherOptions};
+        return {host, port, user, password, db, collection, connectionOptions, queryOptions, aggregationOptions, mapReduceOptions, otherOptions};
     },
 
     async create(
@@ -24,11 +25,12 @@ module.exports = {
             connectionOptions = {useNewUrlParser: true, useUnifiedTopology: true},
             queryOptions = {},
             aggregationOptions = {allowDiskUse: true},
+            mapReduceOptions = {},
             otherOptions = {debug: false, showProgressEvery: undefined},
         },
         {pluginLoader}
     ) {
-        const options = {host, port, user, password, connectionOptions, queryOptions, aggregationOptions, otherOptions};
+        const options = {host, port, user, password, connectionOptions, queryOptions, aggregationOptions, mapReduceOptions, otherOptions};
         if (db || collection) {
             const plugin = await pluginLoader.get({type: 'mongodb', ...options});
             return plugin.use(db, collection);
@@ -83,6 +85,19 @@ class MongoDB {
         }
         return this._handleCursor(
             logger, this._connect(logger).then(coll => coll.aggregate(pipeline, opts))
+        );
+    }
+
+    mapReduce(logger, map, reduce, options) {
+        logger = logger || this.logger;
+        options = {...this.options.mapReduceOptions, ...options};
+        const {debug, ...opts} = options;
+        if (debug || this.options.otherOptions.debug) {
+            const {db, collection} = this.options;
+            logger.debug('mongodb.use(', db, '.', collection, ').mapReduce(', map, ', ', reduce, ', ', opts, ');');
+        }
+        return this._handlePromise(
+            logger, this._connect(logger).then(coll => coll.mapReduce(map, reduce, opts))
         );
     }
 
