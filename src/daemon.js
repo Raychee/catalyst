@@ -37,7 +37,6 @@ module.exports = class {
         this.options.plugins.defaults = this.options.plugins.defaults || {};
         this.options.plugins.config = this.options.plugins.config || {};
         this.options.daemon = this.options.daemon || {};
-        this.options.daemon.waitBeforeStop = this.options.daemon.waitBeforeStop || 0;
         this.options.logging = this.options.logging || {};
         this.options.logging.level = this.options.logging.level || 'INFO';
         this.options.logging.showTimestamp = this.options.logging.showTimestamp || false;
@@ -122,10 +121,6 @@ module.exports = class {
         process.stdout.write('Unloading plugins... ');
         await pluginLoader.unload();
         process.stdout.write('\rUnloading plugins... Done.\n');
-        if (this.options.daemon.waitBeforeStop > 0) {
-            process.stdout.write(`Wait ${this.options.daemon.waitBeforeStop} secs for running jobs to stop. \n`);
-            await sleep(this.options.daemon.waitBeforeStop * 1000);
-        }
         process.stdout.write('Closing connections to database... ');
         await mongodb.close();
         process.stdout.write('\rClosing connections to database... Done.\n');

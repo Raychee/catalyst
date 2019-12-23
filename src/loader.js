@@ -137,9 +137,7 @@ class TaskLoader {
             }
             const taskTypeName = taskTypeNameFields.join('.');
             const taskTypeSpec = require(taskFilePath);
-            const taskType = new TaskType(
-                domain, taskTypeName, this.operations, this.pluginLoader, this.storeCollection, this.jobContextCache
-            );
+            const taskType = new TaskType(domain, taskTypeName, this);
             await taskType.load(taskTypeSpec);
             this.loadedTaskTypes[taskTypeFullName] = taskType;
         }
@@ -153,52 +151,12 @@ class TaskLoader {
         await this.operations.updateTaskTypeConfigs(undefined, dataloaders);
     }
 
-    async rescheduleJobs() {
-        for (const agenda of Object.values(this.agendas)) {
-            while (true) {
-                const agendaJobs = await agenda.jobs({
-                    type: 'normal', lastFinishedAt: null, lockedAt: null, nextRunAt: null, disabled: {$ne: true}
-                }, {}, 200);
-                if (agendaJobs.length > 0 && this._started) {
-                    console.log(`### reschedule agenda jobs: ${agendaJobs.length}`);
-                    const now = new Date();
-                    await Promise.all(agendaJobs.flatMap(agendaJob => {
-                        agendaJob.schedule(now);
-                        const {jobId} = agendaJob.attrs.data;
-                        const promises = [agendaJob.save()];
-                        if (jobId) {
-                            promises.push(this.operations.upsert(
-                                'Job', {id: jobId, status: 'PENDING'}, true, undefined, {id: jobId}
-                            ));
-                        }
-                        return promises;
-                    }));
-                } else {
-                    break;
-                }
-            }
-        }
-        while (true) {
-            const jobs = await this.operations.query('Job', {status: 'INTERRUPTED'}, {limit: 200});
-            if (jobs.length > 0 && this._started) {
-                await Promise.all(jobs.map(({id}) =>
-                    this.operations.scheduleJob({id, status: 'PENDING'}))
-                );
-            } else {
-                break;
-            }
-        }
-    }
-
     async start({verbose = false} = {}) {
         this._started = true;
         if (this.operations) {
             if (verbose) process.stdout.write('Loading task configs... ');
             await this.syncConfigs();
             if (verbose) process.stdout.write('\rLoading task configs... Done.\n');
-            if (verbose) process.stdout.write('Re-scheduling interrupted jobs... ');
-            await this.rescheduleJobs();
-            if (verbose) process.stdout.write('\rRe-scheduling interrupted jobs... Done.\n');
         }
         if (verbose) process.stdout.write('Starting agenda... ');
         await this.taskAgenda.start();
@@ -212,7 +170,6 @@ class TaskLoader {
                     await sleep(this.syncInterval * 1000);
                     try {
                         await this.syncConfigs();
-                        await this.rescheduleJobs();
                     } catch (e) {
                         console.error('Refreshing configs encounters an error: ' + e);
                     }
@@ -224,20 +181,11 @@ class TaskLoader {
     async stop({verbose = false} = {}) {
         this._started = false;
         await this.taskAgenda.stop();
-        const runningJobIds = [];
-        for (const agenda of Object.values(this.agendas)) {
-            runningJobIds.push(...agenda._runningJobs.map(j => j.attrs.data.jobId).filter(i => i));
-        }
         if (verbose) process.stdout.write('Stopping agenda...');
         for (const agenda of Object.values(this.agendas)) {
             await agenda.stop();
         }
         if (verbose) process.stdout.write('\rStopping agenda... Done.\n');
-        if (verbose) process.stdout.write('Marking running jobs as interrupted...');
-        await this.operations.mongodb.collection('Job').updateMany(
-            {id: {$in: runningJobIds}}, {$set: {status: 'INTERRUPTED'}}
-        );
-        if (verbose) process.stdout.write('\rMarking running jobs as interrupted... Done.\n');
     }
 
     async *_scan() {

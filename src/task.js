@@ -44,10 +44,17 @@ class TaskDomain {
 
 class TaskType {
 
-    constructor(domain, name, operations, pluginLoader, storeCollection, jobContextCache) {
+    /**
+     * @param domain {string}
+     * @param name {string}
+     * @param taskLoader {TaskLoader}
+     */
+    constructor(domain, name, taskLoader) {
         this.domain = domain;
         this.name = name;
         this.agendaFn = undefined;
+        this.taskLoader = taskLoader;
+        const {operations, pluginLoader, storeCollection, jobContextCache} = taskLoader;
         this.operations = operations;
         this.pluginLoader = pluginLoader;
         this.jobContextCache = jobContextCache;
@@ -253,7 +260,7 @@ class TaskType {
 
                     callback();
                 } catch (e) {
-                    if (e instanceof JobHeartAttack) {
+                    if (e instanceof JobHeartAttack || e instanceof JobInterruption) {
                         return;
                     }
                     callback(e);
@@ -276,7 +283,7 @@ class Job {
         this._taskType = taskType;
         this._agendaJob = agendaJob;
 
-
+        this._heartbeat = undefined;
         this._logger = undefined;
         this._loggerSys = undefined;
         this._plugins = undefined;
@@ -290,8 +297,8 @@ class Job {
         this._update = limit(Job.prototype._update.bind(this), 1);
     }
 
-    static create(taskType) {
-        const job = new Job(taskType);
+    static create(taskType, agendaJob) {
+        const job = new Job(taskType, agendaJob);
         return new Proxy(job, {
             get(target, p) {
                 if (!p.startsWith('_')) {
@@ -456,13 +463,16 @@ class Job {
 
     async _unload() {
         this._done = true;
-        await Promise.all(Object.values(this._plugins).map(
+        const promises = Object.values(this._plugins).map(
             async ({key, destroy, config = {}}) => {
                 if (!key || config.destroyOnJobDone) {
                     await destroy();
                 }
             }
-        ));
+        );
+        if (promises.length > 0) {
+            await Promise.all(promises);
+        }
     }
 
     async _updateTrial({status, delay, code, message, timeStopped}, updateContext) {
@@ -540,21 +550,14 @@ class Job {
         }
         let updated;
         if (this._taskType.operations) {
-            if (
-                updates.status === 'SUCCESS' ||
-                updates.status === 'FAILED' && updates.timeStopped
-            ) {
-                updated = await this._taskType.operations.upsert('Job', updates, false);
-            } else {
-                updated = await this._taskType.operations.upsert('Job', updates, false, undefined, {status: {$ne: 'INTERRUPTED'}});
-            }
+            this._checkImmediateStop();
+            updated = await this._taskType.operations.upsert('Job', updates, false);
         } else {
             updated = {...this.config, ...updates};
         }
         if (updated) {
             this._setConfig(updated);
         } else {
-            this._interrupted = true;
             this.config = {...this.config, ...updates};
         }
         if (contextUpdate) this.config.context = contextUpdate;
@@ -564,21 +567,14 @@ class Job {
         }
     }
 
-    _checkStatusChange() {
-        if (this._canceled) {
-            const message = this._canceled === '_cancel_status' ?
-                'Job cancels because of manual status change.' :
-                'Job cancels because the task is disabled.';
-            this.cancel(this._canceled, message);
+    _checkImmediateStop() {
+        if (!this._taskType.taskLoader._started) {
+            this._interrupted = true;
+            this._loggerSys.interrupt('Job is interrupted due to possibly system shutdown.');
+            this._logger.interrupt('_interrupt', 'Job is interrupted due to possibly system shutdown.');
         }
-        if (this._interrupted) {
-            this._loggerSys.interrupt('Job is interrupted due to possible system shutdown.');
-            this._logger.interrupt('_interrupt', 'Job is interrupted due to possible system shutdown.');
-        }
-        if (this._timeout) {
-            this._logger.timeout('_timeout', 'Job execution time exceeds ', this.config.timeout, ' seconds and is terminated.');
-        }
-        if (this._heartAttack) {
+        if (this._taskType.operations && Date.now() - this._heartbeat > this._taskType.operations.options.heartAttack * 1000) {
+            this._heartAttack = true;
             this._loggerSys.heartAttack(
                 'Job\'s heartbeat is slower than ',
                 this._taskType.operations.options.heartAttack,
@@ -592,29 +588,40 @@ class Job {
         }
     }
 
+    _checkStatusChange() {
+        this._checkImmediateStop();
+        if (this._canceled) {
+            const message = this._canceled === '_cancel_status' ?
+                'Job cancels because of manual status change.' :
+                'Job cancels because the task is disabled.';
+            this.cancel(this._canceled, message);
+        }
+        if (this._timeout) {
+            this._logger.timeout('_timeout', 'Job execution time exceeds ', this.config.timeout, ' seconds and is terminated.');
+        }
+    }
+
     async _syncStatus() {
-        let lastTouchedAt = undefined;
-        while (!this._done && !this._interrupted && !this._canceled && !this._timeout) {
+        const isActive = () => !this._done && !this._interrupted && !this._heartAttack && !this._canceled && !this._timeout;
+        while (isActive()) {
             await sleep(this._taskType.operations.options.heartbeat * 1000);
-            if (!this.config.id) continue;
             try {
-                const task = await this._taskType.operations.getTask([this.config.task]);
-                const diff = await this._taskType.operations.populateJobSchedulingProperties(this.config, task, undefined, true);
-                await this._update(diff, true);
-                if (this.config.status === 'CANCELED') {
-                    this._canceled ='_cancel_status';
-                }
-                if (!task.enabled) {
-                    this._canceled = '_cancel_disabled';
+                if (this.config.id) {
+                    const task = await this._taskType.operations.getTask([this.config.task]);
+                    const diff = await this._taskType.operations.populateJobSchedulingProperties(this.config, task, undefined, true);
+                    if (!isActive()) break;
+                    await this._update(diff, true);
+                    if (this.config.status === 'CANCELED') {
+                        this._canceled ='_cancel_status';
+                    }
+                    if (!task.enabled) {
+                        this._canceled = '_cancel_disabled';
+                    }
                 }
                 if (this._agendaJob) {
-                    const now = Date.now();
-                    if (now - lastTouchedAt > this._taskType.operations.options.heartAttack * 1000) {
-                        this._heartAttack = true;
-                    } else {
-                        lastTouchedAt = now;
-                        await this._agendaJob.touch();
-                    }
+                    this._heartbeat = new Date();
+                    if (!isActive()) break;
+                    await this._agendaJob.touch();
                 }
                 if (this.config.timeout > 0 && this._started < Date.now() - this.config.timeout * 1000) {
                     this._timeout = true;
