@@ -565,6 +565,7 @@ class Job {
             this._setConfig(updated);
         } else {
             this._interrupted = true;
+            this._checkImmediateStop();
             this.config = {...this.config, ...updates};
         }
         if (contextUpdate) this.config.context = contextUpdate;
