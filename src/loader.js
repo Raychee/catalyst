@@ -29,6 +29,15 @@ const {StoreLogger} = require('./logger');
 
 class TaskLoader {
 
+    /**
+     * @param loadPaths {string[]}
+     * @param operations {Operations}
+     * @param pluginLoader {PluginLoader}
+     * @param storeCollection {Collection}
+     * @param jobContextCache
+     * @param newAgenda
+     * @param taskAgendaName
+     */
     constructor(loadPaths, operations, pluginLoader, storeCollection,
                 jobContextCache, newAgenda, taskAgendaName) {
         this.loadPaths = loadPaths;
@@ -181,6 +190,15 @@ class TaskLoader {
     async stop({verbose = false} = {}) {
         this._started = false;
         await this.taskAgenda.stop();
+        if (verbose) process.stdout.write('Marking running jobs back as pending...');
+        const runningJobIds = [];
+        for (const agenda of Object.values(this.agendas)) {
+            runningJobIds.push(...agenda._runningJobs.map(j => j.attrs.data.jobId).filter(i => i));
+        }
+        await this.operations.mongodb.collection('Job').updateMany(
+            {id: {$in: runningJobIds}}, {$set: {status: 'PENDING'}}
+        );
+        if (verbose) process.stdout.write('\rMarking running jobs back as pending... Done.\n');
         if (verbose) process.stdout.write('Stopping agenda...');
         for (const agenda of Object.values(this.agendas)) {
             await agenda.stop();

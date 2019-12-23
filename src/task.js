@@ -551,13 +551,20 @@ class Job {
         let updated;
         if (this._taskType.operations) {
             this._checkImmediateStop();
-            updated = await this._taskType.operations.upsert('Job', updates, false);
+            if (this.config.status !== 'PENDING') {
+                updated = await this._taskType.operations.upsert(
+                    'Job', updates, false, undefined, {status: {$ne: 'PENDING'}}
+                );
+            } else {
+                updated = await this._taskType.operations.upsert('Job', updates);
+            }
         } else {
             updated = {...this.config, ...updates};
         }
         if (updated) {
             this._setConfig(updated);
         } else {
+            this._interrupted = true;
             this.config = {...this.config, ...updates};
         }
         if (contextUpdate) this.config.context = contextUpdate;
@@ -569,6 +576,9 @@ class Job {
 
     _checkImmediateStop() {
         if (!this._taskType.taskLoader._started) {
+            this._interrupted = true;
+        }
+        if (this._interrupted) {
             this._interrupted = true;
             this._loggerSys.interrupt('Job is interrupted due to possibly system shutdown.');
             this._logger.interrupt('_interrupt', 'Job is interrupted due to possibly system shutdown.');
