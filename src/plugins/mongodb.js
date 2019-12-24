@@ -9,9 +9,9 @@ module.exports = {
     key(
         {
             host, port, user, password, db, collection,
-            connectionOptions = {useNewUrlParser: true, useUnifiedTopology: true},
+            connectionOptions = {},
             queryOptions = {},
-            aggregationOptions = {allowDiskUse: true},
+            aggregationOptions = {},
             mapReduceOptions = {},
             otherOptions = {debug: false, showProgressEvery: undefined},
         }
@@ -22,9 +22,9 @@ module.exports = {
     async create(
         {
             host, port, user, password, db, collection,
-            connectionOptions = {useNewUrlParser: true, useUnifiedTopology: true},
+            connectionOptions = {},
             queryOptions = {},
-            aggregationOptions = {allowDiskUse: true},
+            aggregationOptions = {},
             mapReduceOptions = {},
             otherOptions = {debug: false, showProgressEvery: undefined},
         },

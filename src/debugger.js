@@ -70,6 +70,7 @@ module.exports = class {
 
         this.taskLoader = new TaskLoader(this.options.tasks.paths, undefined, this.pluginLoader, storeCollection);
         await this.taskLoader.load({verbose: true});
+        this.taskLoader._started = true;
 
         process.stdout.write(`${this.options.name} (debugger) is started.\n`);
 

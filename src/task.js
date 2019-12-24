@@ -264,6 +264,8 @@ class TaskType {
                         return;
                     }
                     callback(e);
+                } finally {
+                    job._done = true;
                 }
             }
         }
@@ -462,7 +464,6 @@ class Job {
     }
 
     async _unload() {
-        this._done = true;
         const promises = Object.values(this._plugins).map(
             async ({key, destroy, config = {}}) => {
                 if (!key || config.destroyOnJobDone) {
