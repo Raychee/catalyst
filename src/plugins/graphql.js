@@ -16,7 +16,7 @@ const {dedup} = require('@raychee/utils');
 
 
 class GraphQLClient {
-    constructor(logger, uri, id, password, httpOptions = {}) {
+    constructor(logger, uri, id, password, httpOptions, otherOptions) {
         // httpOptions - https://www.apollographql.com/docs/link/links/http/#options
         this.logger = logger;
         this.uri = uri;
@@ -78,6 +78,8 @@ class GraphQLClient {
                 mutate: {fetchPolicy: 'no-cache'},
             }
         });
+        this.options = otherOptions;
+        this.counter = 0;
 
         this._authenticate = dedup(GraphQLClient.prototype._authenticate.bind(this));
     }
@@ -100,6 +102,7 @@ class GraphQLClient {
                 logger = logger || this.logger;
                 if (!projections || isEmpty(projections)) projections = defaultProjections;
                 try {
+                    await this._resetClient();
                     const resp = await this.apolloClient.query({
                         query: gql`query (${queryArgDeclare}) { ${field.name} (${queryArgs}) ${makeReturnExpr(projections) } }`,
                         variables
@@ -130,6 +133,7 @@ class GraphQLClient {
                 logger = logger || this.logger;
                 if (!projections || isEmpty(projections)) projections = defaultProjections;
                 try {
+                    await this._resetClient();
                     const resp = await this.apolloClient.mutate({
                         mutation: gql`mutation (${queryArgDeclare}) { ${field.name} (${queryArgs}) ${makeReturnExpr(projections)} }`,
                         variables
@@ -168,6 +172,14 @@ class GraphQLClient {
         this.jwt = jwt;
     }
 
+    async _resetClient() {
+        this.counter++;
+        if (this.counter > this.options.resetStoreEvery) {
+            await this.apolloClient.resetStore();
+            this.counter = 0;
+        }
+    }
+
 }
 
 function makeFieldTypeExpr(type) {
@@ -200,11 +212,11 @@ function makeReturnExpr(projections) {
 
 
 module.exports = {
-    key(options = {}) {
-        return options;
+    key({uri, id, password, httpOptions, otherOptions = {resetStoreEvery: 100}} = {}) {
+        return {uri, id, password, httpOptions, otherOptions};
     },
-    async create({uri, id, password, httpOptions} = {}) {
-        const client = new GraphQLClient(this, uri, id, password, httpOptions);
+    async create({uri, id, password, httpOptions, otherOptions = {resetStoreEvery: 100}} = {}) {
+        const client = new GraphQLClient(this, uri, id, password, httpOptions, otherOptions);
         await client._connect();
         return client;
     }
