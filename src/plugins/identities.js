@@ -139,8 +139,8 @@ class Identities {
         this._syncStore();
     }
 
-    update(_, id, data) {
-        const {id, identity} = this._find(one);
+    update(_, one, data) {
+        const {identity} = this._find(one);
         if (!identity) return;
         identity.data = data;
         this._syncStore();
