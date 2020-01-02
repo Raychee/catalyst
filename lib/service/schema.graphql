@@ -180,18 +180,16 @@ type Task {
     schedule: String @query @upsert
     # @auth(query: ["A:q", "Task:schedule:q"], result: ["A:r", "Task:schedule:r"])
 
+    "对于定时任务（type=SCHEDULED），定时的时区"
+    timezone: String @query @upsert
+#   @auth(query: ["A:q", "Task:timezone:q"], result: ["A:r", "Task:timezone:r"])
     "下一次执行时间"
-    nextRun: DateTime
-#     @auth(query: ["A:q", "Task:nextRun:q"], result: ["A:r", "Task:nextRun:r"])
-
+    nextTime: DateTime
+#     @auth(query: ["A:q", "Task:nextTime:q"], result: ["A:r", "Task:nextTime:r"])
     "上一次执行时间"
-    lastRun: DateTime
-#    @auth(query: ["A:q", "Task:lastRun:q"], result: ["A:r", "Task:lastRun:r"])
-    
-    # "Crawler Api 系统中的用户身份信息，特指该 Task 发起者"
-    user: String @query @upsert
-    # @auth(query: ["A:q", "Task:user:q"], result: ["A:r", "Task:user:r"])
-    
+    lastTime: DateTime
+#    @auth(query: ["A:q", "Task:lastTime:q"], result: ["A:r", "Task:lastTime:r"])
+
     "任务创建时间"
     ctime: DateTime @query
     # @auth(query: ["A:q", "Task:ctime:q"], result: ["A:r", "Task:ctime:r"])
@@ -262,7 +260,7 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     如果该实例是由任务直接创建，那么此字段就指向它；
     如果该实例是由别的任务实例创建，那么此字段指向的是实例创建链中最源头的实例所对应的任务。
     """
-    task: Task @query
+    task: Task! @query
     # @auth(query: ["Job:task:q"], result: ["Job:task:r"])
     "如果该实例是由别的任务实例创建，此字段表明直接创建它的任务实例；其他情况下为空。"
     createdBy: Job @query
@@ -293,6 +291,25 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     "任务失败的代码和描述信息，任务成功则为空"
     fail: JobFailStatus @query
     # @auth(query: ["Job:fail:q"], result: ["Job:fail:r"])
+}
+
+"任务流"
+type TaskFlow {
+    "任务流全局唯一id"
+    id: ID! @query @upsert
+    # @auth(query: ["A:q", "Task:id:q"], result: ["A:r", "Task:id:r"])
+    "任务"
+    tasks: [Task!]! @query @upsert
+    "任务是否激活"
+    enabled: Boolean @query @upsert
+    # @auth(query: ["A:q", "Task:enabled:q"], result: ["A:r", "Task:enabled:r"])
+    "任务优先级，一般为0，数字越大优先级越高"
+    priority: Int @query @upsert
+    "任务执行有效时间; 如果没有设定该值，则认为 Task 长期有效"
+    # @auth(query: ["A:q", "Task:priority:q"], result: ["A:r", "Task:priority:r"])
+    validBefore: DateTime @query @upsert
+    "任务开始有效执行时间; 如果没有设定该值，则认为 Task 长期有效"
+    validAfter: DateTime @query @upsert
 }
 
 enum JobStatus {
@@ -331,11 +348,37 @@ type JobFailStatus {
     message: String @query
 }
 
+type TaskConfig {
+    "任务业务域"
+    domain: String! @query @upsert
+    "任务类型，决定了任务的执行逻辑"
+    type: String! @query @upsert
+    "任务参数，具体有哪些参数跟任务类型有关"
+    params: JSONObject @query @upsert
+    "任务初始上下文，建议尽量不指定"
+    context: JSONObject @query @upsert
+    "任务优先级，一般为0，数字越大优先级越高"
+    priority: Int @query @upsert
+    "延迟执行的时间间隔，单位秒，如果没有设定该值，默认会参照TaskTypeConfig.delay"
+    delay: Float @query @upsert
+    """
+    任务启动时，默认延迟执行的时间的随机抖动系数。
+    0~1之间，0表示不抖动，1则表示延迟时间在[0, 2 x 默认延迟时间]随机取值。
+    """
+    delayRandomize: Float @query @upsert
+    "任务实例失败时，默认最大重试次数。为0则不重试。"
+    retry: Int @query @upsert
+    "任务实例重试随着次数增多，每次重试实例延迟执行的时间基于delay指数放大，此为放大倍数。"
+    retryDelayFactor: Float @query @upsert
+}
+
 type TaskSchedulingConfig {
     "任务业务域"
     domain: String! @query @upsert
     "任务类型，决定了任务的执行逻辑"
     type: String! @query @upsert
+    "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
+    timeout: Int @query @upsert
     "任务优先级，一般为0，数字越大优先级越高"
     priority: Int @query @upsert
     "延迟执行的时间间隔，单位秒，如果没有设定该值，默认会参照TaskTypeConfig.delay"
