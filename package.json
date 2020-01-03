@@ -16,7 +16,6 @@
   "homepage": "https://github.com/Raychee/catalyst#readme",
   "dependencies": {
     "@raychee/utils": "^0.1.10",
-    "agenda": "git+https://github.com/hellohupu/agenda.git#feature/catatechcn",
     "apollo-cache-inmemory": "^1.6.2",
     "apollo-client": "^2.6.3",
     "apollo-link": "^1.2.12",

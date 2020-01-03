@@ -2,13 +2,16 @@ const {MongoClient} = require('mongodb');
 const {sleep} = require('@raychee/utils');
 
 const {Logger} = require('../lib/logger');
+const {TaskDomain, TaskType} = require('../lib/task');
 const Operations = require('../lib/operations');
 const Scheduler = require('../lib/scheduler');
 
 
 describe('Scheduler', () => {
 
-    let connection, db, operations;
+    let connection, db;
+    /** @type Operations */
+    let operations;
 
     beforeAll(async () => {
         connection = await MongoClient.connect(process.env.MONGO_URL, {
@@ -16,14 +19,21 @@ describe('Scheduler', () => {
             useUnifiedTopology: true,
         });
         db = await connection.db('test_scheduler');
-        operations = new Operations(new Logger('Operations'), db, {
-            async get() {
+        const taskLoader = {
+            getAllTaskDomains() {
+                return [];
+            },
+            getAllTaskTypes() {
+                return [];
+            },
+            async getTaskType() {
                 return {
                     validate() {
                     }
                 };
             }
-        });
+        };
+        operations = new Operations(new Logger('Operations'), db, taskLoader);
     });
 
     afterAll(async () => {
@@ -120,17 +130,17 @@ describe('Scheduler', () => {
     });
 
     test('dispatch jobs', async () => {
-        await operations.ensureTaskDomainConfig('domainCurrency3');
-        await operations.updateTaskDomainConfigs({domain: 'domainCurrency3'}, {maxConcurrency: 3});
-        await operations.ensureTaskTypeConfig('domainCurrency3', 'typeCurrency1');
-        await operations.updateTaskTypeConfigs({domain: 'domainCurrency3', type: 'typeCurrency1'}, {concurrency: 1});
-        await operations.ensureTaskTypeConfig('domainCurrency3', 'typeCurrency4');
-        await operations.updateTaskTypeConfigs({domain: 'domainCurrency3', type: 'typeCurrency4'}, {concurrency: 4});
+        await operations.ensureDomain('domainCurrency3');
+        await operations.updateDomains({domain: 'domainCurrency3'}, {maxConcurrency: 3});
+        await operations.ensureType('domainCurrency3', 'typeCurrency1');
+        await operations.updateTypes({domain: 'domainCurrency3', type: 'typeCurrency1'}, {concurrency: 1});
+        await operations.ensureType('domainCurrency3', 'typeCurrency4');
+        await operations.updateTypes({domain: 'domainCurrency3', type: 'typeCurrency4'}, {concurrency: 4});
 
-        await operations.ensureTaskDomainConfig('domainCurrency100');
-        await operations.updateTaskDomainConfigs({domain: 'domainCurrency100'}, {maxConcurrency: 100});
-        await operations.ensureTaskTypeConfig('domainCurrency100', 'typeCurrency2');
-        await operations.updateTaskTypeConfigs({domain: 'domainCurrency100', type: 'typeCurrency2'}, {concurrency: 2});
+        await operations.ensureDomain('domainCurrency100');
+        await operations.updateDomains({domain: 'domainCurrency100'}, {maxConcurrency: 100});
+        await operations.ensureType('domainCurrency100', 'typeCurrency2');
+        await operations.updateTypes({domain: 'domainCurrency100', type: 'typeCurrency2'}, {concurrency: 2});
 
         const scheduler1 = new Scheduler(
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
@@ -165,8 +175,8 @@ describe('Scheduler', () => {
     });
 
     test('schedule tasks', async () => {
-        await operations.ensureTaskDomainConfig('domain');
-        await operations.ensureTaskTypeConfig('domain', 'type');
+        await operations.ensureDomain('domain');
+        await operations.ensureType('domain', 'type');
 
         const t1 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'ONCE'
@@ -223,6 +233,47 @@ describe('Scheduler', () => {
         expect(await operations.jobs.countDocuments({task: t3._id})).toBe(1);
 
     });
+
+    test('schedule jobs', async () => {
+        await operations.ensureDomain('domain');
+        await operations.ensureType('domain', 'type');
+        await operations.updateDomains({domain: 'domain'}, {retry: 3});
+
+        const taskDomain = new TaskDomain('domain');
+        const taskType = new TaskType(taskDomain, 'type');
+        await taskType.load({
+            async run() {
+                await this.schedule('domain.type', {v: 'scheduled'});
+            },
+        });
+        const taskLoader = {
+            async getTaskType() {
+                return taskType;
+            }
+        };
+        const scheduler = new Scheduler(
+            new Logger('Scheduler'), operations, taskLoader, {heartbeat: 0.1, heartAttack: 1}
+        );
+        await scheduler._activate();
+        scheduler.running = Promise.resolve();
+
+        let t1 = await operations.insertTask({domain: 'domain', type: 'type', mode: 'ONCE'});
+        let j1 = await operations.insertJob({task: t1._id});
+        await operations.updateJobs({_id: j1._id}, {trials: [{status: 'FAILED'}, {status: 'FAILED'}], lockedBy: scheduler.id});
+        j1 = await operations.jobs.findOne({_id: j1._id});
+
+        await scheduler._executeJob(j1);
+
+        const j2 = await operations.jobs.findOne({_id: j1._id});
+        expect(j2).toMatchObject({status: 'SUCCESS', lockedBy: null});
+        expect(j2.trials).toHaveLength(2);
+        expect(j2.trials[0]).toStrictEqual({status: 'FAILED'});
+        expect(j2.trials[1]).toMatchObject({status: 'SUCCESS', delay: 0});
+
+        const j3 = await operations.jobs.findOne({'params.v': 'scheduled'});
+        expect(j3).toBeTruthy();
+
+    }, 10000000);
 
     test('compute next time', async () => {
         const scheduler = new Scheduler(

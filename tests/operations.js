@@ -8,6 +8,8 @@ describe('Operations', () => {
 
     let connection;
     let db;
+
+    /** @type Operations */
     let operations;
 
     let domain1, taskType1, taskType2, task1, job1, job2;
@@ -15,7 +17,7 @@ describe('Operations', () => {
     beforeAll(async () => {
 
         const taskLoader = {
-            async get() {
+            async getTaskType() {
                 return {
                     validate() {}
                 };
@@ -46,17 +48,17 @@ describe('Operations', () => {
                 ['A', 'b'],
                 ['B', 'x'],
             ]) {
-                const {ctime: c1, mtime: m1, ...domain} = await operations.ensureTaskDomainConfig(domainName);
+                const {ctime: c1, mtime: m1, ...domain} = await operations.ensureDomain(domainName);
                 expect(domain).toStrictEqual({domain: domainName, maxConcurrency: 1, ...config});
-                const {ctime: c2, mtime: m2, ...type} = await operations.ensureTaskTypeConfig(domainName, typeName);
+                const {ctime: c2, mtime: m2, ...type} = await operations.ensureType(domainName, typeName);
                 expect(type).toStrictEqual({domain: domainName, type: typeName, ...config});
             }
-            let taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            let taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i1, ctime: c1, mtime: m1, local: l1, ...t1} = taskType;
             expect(t1).toStrictEqual({domain: 'B', type: 'x', ...config});
             taskType1 = taskType;
 
-            taskType = await operations.taskTypes.findOne({domain: 'A', type: 'b'});
+            taskType = await operations.types.findOne({domain: 'A', type: 'b'});
             const {_id: i2, ctime: c2, mtime: m2, local: l2, ...t2} = taskType;
             expect(t2).toStrictEqual({domain: 'A', type: 'b', ...config});
             taskType2 = taskType;
@@ -70,11 +72,11 @@ describe('Operations', () => {
 
     describe('update task domains and types', () => {
         test('', async () => {
-            let modified = await operations.updateTaskTypeConfigs(
+            let modified = await operations.updateTypes(
                 {domain: 'B', type: 'x'}, {subTasks: [{domain: 'A', type: 'b', delay: 30}]}
             );
             expect(modified).toBeGreaterThan(0);
-            let taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            let taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i, ctime: c, mtime: m, local: l, ...t} = taskType;
             const {_id: i1, ctime: c1, mtime: m1, local: l1, ...t1} = taskType1;
             expect(t).toStrictEqual({...t1, subTasks: [{domain: 'A', type: 'b', delay: 30}]});
@@ -82,11 +84,11 @@ describe('Operations', () => {
             expect(l).toStrictEqual({subTasks: [{domain: 'A', type: 'b', delay: 30}]});
             taskType1 = taskType;
 
-            modified = await operations.updateTaskTypeConfigs(
+            modified = await operations.updateTypes(
                 {domain: 'A', type: 'b'}, {delay: 5}
             );
             expect(modified).toBeGreaterThan(0);
-            taskType = await operations.taskTypes.findOne({domain: 'A', type: 'b'});
+            taskType = await operations.types.findOne({domain: 'A', type: 'b'});
             const {_id: i2, ctime: c2, mtime: m2, local: l2, ...t2} = taskType;
             const {_id: i3, ctime: c3, mtime: m3, local: l3, ...t3} = taskType2;
             expect(t2).toStrictEqual({...t3, delay: 5});
@@ -94,7 +96,7 @@ describe('Operations', () => {
             expect(l2).toStrictEqual({delay: 5});
             taskType2 = taskType;
 
-            modified = await operations.updateTaskDomainConfigs(
+            modified = await operations.updateDomains(
                 {domain: 'B'}, {delay: 2}
             );
             expect(modified).toBeGreaterThan(0);
@@ -106,7 +108,7 @@ describe('Operations', () => {
             expect(l4).toStrictEqual({delay: 2});
             domain1 = domain;
 
-            taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i6, ctime: c6, mtime: m6, local: l6, ...t6} = taskType;
             const {_id: i7, ctime: c7, mtime: m7, local: l7, ...t7} = taskType1;
             expect(t6).toStrictEqual({...t7, delay: 2});
@@ -323,10 +325,10 @@ describe('Operations', () => {
 
     describe('update a task type with non-null values', () => {
         test('', async () => {
-            let modified = await operations.updateTaskTypeConfigs({domain: 'B', type: 'x'}, {delay: 29});
+            let modified = await operations.updateTypes({domain: 'B', type: 'x'}, {delay: 29});
             expect(modified).toBeGreaterThan(0);
 
-            const taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            const taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i6, ctime: c6, mtime: m6, local: l6, ...t6} = taskType;
             const {_id: i7, ctime: c7, mtime: m7, local: l7, ...t7} = taskType1;
             expect(t6).toStrictEqual({...t7, delay: 29});
@@ -352,10 +354,10 @@ describe('Operations', () => {
 
     describe('update a task type with null values', () => {
         test('', async () => {
-            let modified = await operations.updateTaskTypeConfigs({domain: 'B', type: 'x'}, {delay: null});
+            let modified = await operations.updateTypes({domain: 'B', type: 'x'}, {delay: null});
             expect(modified).toBeGreaterThan(0);
 
-            const taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            const taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i6, ctime: c6, mtime: m6, local: l6, ...t6} = taskType;
             const {_id: i7, ctime: c7, mtime: m7, local: l7, ...t7} = taskType1;
             expect(t6).toStrictEqual({...t7, delay: 2});
@@ -381,7 +383,7 @@ describe('Operations', () => {
 
     describe('update a domain with non-null values', () => {
         test('', async () => {
-            let modified = await operations.updateTaskDomainConfigs({domain: 'B'}, {delay: 31});
+            let modified = await operations.updateDomains({domain: 'B'}, {delay: 31});
             expect(modified).toBeGreaterThan(0);
 
             const domain = await operations.domains.findOne({domain: 'B'});
@@ -391,7 +393,7 @@ describe('Operations', () => {
             expect(l4).toStrictEqual({...l5, delay: 31});
             domain1 = domain;
 
-            const taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            const taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i6, ctime: c6, mtime: m6, local: l6, ...t6} = taskType;
             const {_id: i7, ctime: c7, mtime: m7, local: l7, ...t7} = taskType1;
             expect(t6).toStrictEqual({...t7, delay: 31});
@@ -417,7 +419,7 @@ describe('Operations', () => {
 
     describe('update a domain with null values', () => {
         test('', async () => {
-            let modified = await operations.updateTaskDomainConfigs({domain: 'B'}, {delay: null});
+            let modified = await operations.updateDomains({domain: 'B'}, {delay: null});
             expect(modified).toBeGreaterThan(0);
 
             const domain = await operations.domains.findOne({domain: 'B'});
@@ -427,7 +429,7 @@ describe('Operations', () => {
             expect(l4).toStrictEqual({...l5, delay: null});
             domain1 = domain;
 
-            const taskType = await operations.taskTypes.findOne({domain: 'B', type: 'x'});
+            const taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i6, ctime: c6, mtime: m6, local: l6, ...t6} = taskType;
             const {_id: i7, ctime: c7, mtime: m7, local: l7, ...t7} = taskType1;
             expect(t6).toStrictEqual({...t7, delay: 0});

@@ -8,7 +8,9 @@ const {TaskDomain, TaskType, Job} = require('../lib/task');
 
 describe('Job', () => {
 
-    let connection, db, operations;
+    let connection, db;
+    /** @type Operations */
+    let operations;
 
     beforeAll(async () => {
         connection = await MongoClient.connect(process.env.MONGO_URL, {
@@ -17,7 +19,7 @@ describe('Job', () => {
         });
         db = await connection.db('test_task');
         operations = new Operations(new Logger('Operations'), db, {
-            async get() {
+            async getTaskType() {
                 return {
                     validate() {
                     }
@@ -49,11 +51,11 @@ describe('Job', () => {
             }
         });
 
-        await operations.ensureTaskDomainConfig('domain1');
-        await operations.ensureTaskTypeConfig('domain1', 'type1');
-        await operations.ensureTaskTypeConfig('domain1', 'type2');
-        await operations.ensureTaskTypeConfig('domain1', 'type3');
-        await operations.updateTaskDomainConfigs({domain: 'domain1'}, {retry: 2});
+        await operations.ensureDomain('domain1');
+        await operations.ensureType('domain1', 'type1');
+        await operations.ensureType('domain1', 'type2');
+        await operations.ensureType('domain1', 'type3');
+        await operations.updateDomains({domain: 'domain1'}, {retry: 2});
         const taskConfig = await operations.insertTask({
             domain: 'domain1', type: 'type1', params: {v: 1}, mode: 'ONCE'
         });
@@ -101,6 +103,7 @@ describe('Job', () => {
                 expect(timeStopped).toBeDefined();
                 expect(scheduled1).toMatchObject({
                     domain: 'domain1', type: 'type2', params: {id: job.config._id, vv: 2}, retry: 2,
+                    task: taskConfig._id, createdBy: jobConfig._id, createdFrom: jobConfig._id,
                 });
             }
         }
@@ -128,10 +131,10 @@ describe('Job', () => {
             }
         });
 
-        await operations.ensureTaskDomainConfig('domain2');
-        await operations.ensureTaskTypeConfig('domain2', 'type1');
-        await operations.ensureTaskTypeConfig('domain2', 'type2');
-        await operations.updateTaskDomainConfigs({domain: 'domain2'}, {retry: 2});
+        await operations.ensureDomain('domain2');
+        await operations.ensureType('domain2', 'type1');
+        await operations.ensureType('domain2', 'type2');
+        await operations.updateDomains({domain: 'domain2'}, {retry: 2});
         const taskConfig = await operations.insertTask({
             domain: 'domain2', type: 'type1', params: {v: 1}, mode: 'ONCE'
         });
@@ -148,7 +151,8 @@ describe('Job', () => {
                 await job._executeTrial();
             } catch (e) {
                 expect(trial).toBe(job.config.retry);
-                expect(e.message).toBe('crash');
+                expect(e.name).toBe('CatchableError');
+                expect(e.error.message).toBe('crash');
             }
             const {timeStarted: t1, timeStopped: t2, ...t} = job.config.trials[trial];
             const scheduled = await operations.jobs.find({domain: 'domain2', type: 'type2'}).toArray();
@@ -187,12 +191,12 @@ describe('Job', () => {
         const taskType = new TaskType(taskDomain, 'type1');
         await taskType.load({
             async run() {
-                await this.delay(1);
+                await this.delay(2);
             }
         });
 
-        await operations.ensureTaskDomainConfig('domain3');
-        await operations.ensureTaskTypeConfig('domain3', 'type1');
+        await operations.ensureDomain('domain3');
+        await operations.ensureType('domain3', 'type1');
         const taskConfig = await operations.insertTask({domain: 'domain3', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
@@ -222,12 +226,12 @@ describe('Job', () => {
         const taskType = new TaskType(taskDomain, 'type1');
         await taskType.load({
             async run() {
-                await this.delay(1);
+                await this.delay(2);
             }
         });
 
-        await operations.ensureTaskDomainConfig('domain4');
-        await operations.ensureTaskTypeConfig('domain4', 'type1');
+        await operations.ensureDomain('domain4');
+        await operations.ensureType('domain4', 'type1');
         const taskConfig = await operations.insertTask({domain: 'domain4', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
@@ -257,9 +261,9 @@ describe('Job', () => {
         const taskType = new TaskType(taskDomain, 'type1');
         await taskType.load({});
 
-        await operations.ensureTaskDomainConfig('domain5');
-        await operations.ensureTaskTypeConfig('domain5', 'type1');
-        await operations.updateTaskDomainConfigs({domain: 'domain5'}, {delay: 1});
+        await operations.ensureDomain('domain5');
+        await operations.ensureType('domain5', 'type1');
+        await operations.updateDomains({domain: 'domain5'}, {delay: 2});
         const taskConfig = await operations.insertTask({domain: 'domain5', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
@@ -268,13 +272,42 @@ describe('Job', () => {
         const execute = job._execute();
         const changeDelay = (async () => {
             await sleep(200);
-            await operations.updateTaskDomainConfigs({domain: 'domain5'}, {delay: 2});
+            await operations.updateDomains({domain: 'domain5'}, {delay: 3});
         })();
         await Promise.all([execute, changeDelay]);
         expect(job.config.status).toBe('SUCCESS');
         expect(job.config.fail).toBeUndefined();
         expect(job.config.trials).toHaveLength(1);
-        expect(job.config.trials[0]).toMatchObject({status: 'SUCCESS', delay: 2});
+        expect(job.config.trials[0]).toMatchObject({status: 'SUCCESS', delay: 3});
+    });
+
+    test('run a long job that timeouts', async () => {
+        const taskDomain = new TaskDomain('domain6');
+        const taskType = new TaskType(taskDomain, 'type1');
+        await taskType.load({
+            async run() {
+                await this.delay(2);
+            }
+        });
+
+        await operations.ensureDomain('domain6');
+        await operations.ensureType('domain6', 'type1');
+        await operations.updateDomains({domain: 'domain6'}, {timeout: 1});
+        const taskConfig = await operations.insertTask({domain: 'domain6', type: 'type1', mode: 'ONCE'});
+        const jobConfig = await operations.insertJob({task: taskConfig._id});
+
+        const job = new Job(jobConfig, taskType, undefined, operations);
+
+        await job._execute();
+        expect(job.config.status).toBe('FAILED');
+        expect(job.config.fail).toStrictEqual({
+            code: '_timeout', message: 'Job execution time exceeds 1 seconds and is terminated.'
+        });
+        expect(job.config.trials).toHaveLength(1);
+        expect(job.config.trials[0]).toMatchObject({
+            status: 'FAILED', delay: 0,
+            fail: {code: '_timeout', message: 'Job execution time exceeds 1 seconds and is terminated.'}
+        });
     });
 
 });

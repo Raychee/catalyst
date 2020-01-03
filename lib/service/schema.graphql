@@ -9,6 +9,7 @@ directive @result on FIELD_DEFINITION
 directive @jwt(secret: String!, algorithm: String, expiresIn: Int, notBefore: Int) on SCHEMA
 directive @auth(query: [String!], upsert: [String!], result: [String!], silent: Boolean = true) on OBJECT | FIELD_DEFINITION
 
+
 schema @jwt(secret: "${secret}", expiresIn: 1800) {
     query: Query
     mutation: Mutation
@@ -16,8 +17,8 @@ schema @jwt(secret: "${secret}", expiresIn: 1800) {
 
 type Query {
 
-    TaskDomainConfig: [TaskDomainConfig!]! @result @sort @page
-    TaskTypeConfig: [TaskTypeConfig!]! @result @sort @page
+    Domain: [Domain!]! @result @sort @page
+    Type: [Type!]! @result @sort @page
     Task: [Task!]! @result @sort @page
     Job: [Job!]! @result @sort @page
 
@@ -25,15 +26,15 @@ type Query {
 
 type Mutation {
 
-    UpdateTaskDomainConfig: TaskDomainConfig
-    UpdateTaskTypeConfig: TaskTypeConfig
+    UpdateDomain: Domain
+    UpdateType: Type
     UpdateTask: Task
     UpdateJob: Job
 
 }
 
 
-type TaskDomainConfig { # @auth(query: ["B:q","TaskDomainConfig:q"], upsert: ["B:u", "TaskDomainConfig:u"], result: ["B:r", "TaskDomainConfig:r"]){
+type Domain { # @auth(query: ["B:q","TaskDomainConfig:q"], upsert: ["B:u", "TaskDomainConfig:u"], result: ["B:r", "TaskDomainConfig:r"]){
     "任务业务域"
     domain: String! @query @upsert
     "该业务域下所有类型的任务整体最大并发数限制，<=0为不限制"
@@ -67,7 +68,7 @@ type TaskDomainConfig { # @auth(query: ["B:q","TaskDomainConfig:q"], upsert: ["B
 }
 
 "任务类型级别的配置"
-type TaskTypeConfig { # @auth(query: ["B:q", "TaskTypeConfig:q"], upsert: ["B:u", "TaskTypeConfig:u"], result: ["B:r", "TaskTypeConfig:r"]){
+type Type { # @auth(query: ["B:q", "TaskTypeConfig:q"], upsert: ["B:u", "TaskTypeConfig:u"], result: ["B:r", "TaskTypeConfig:r"]){
     "任务业务域"
     domain: String! @query @upsert
     "任务类型"
@@ -184,10 +185,10 @@ type Task {
     timezone: String @query @upsert
 #   @auth(query: ["A:q", "Task:timezone:q"], result: ["A:r", "Task:timezone:r"])
     "下一次执行时间"
-    nextTime: DateTime
+    nextTime: DateTime @query
 #     @auth(query: ["A:q", "Task:nextTime:q"], result: ["A:r", "Task:nextTime:r"])
     "上一次执行时间"
-    lastTime: DateTime
+    lastTime: DateTime @query
 #    @auth(query: ["A:q", "Task:lastTime:q"], result: ["A:r", "Task:lastTime:r"])
 
     "任务创建时间"
@@ -227,7 +228,7 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     context: JSONObject @query
     # @auth(query: ["Job:context:q"], result: ["Job:context:r"])
     "任务实例的优先级"
-    priority: Int @query
+    priority: Int @query @upsert
     # @auth(query: ["Job:priority:q"], result: ["Job:priority:r"])
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
@@ -240,7 +241,7 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
     timeout: Int @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
-    delay: Float @query
+    delay: Float @query @upsert
     # @auth(query: ["Job:delay:q"], result: ["Job:delay:r"])
     """
     任务启动时，默认延迟执行的时间的随机抖动系数。
@@ -293,25 +294,6 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     # @auth(query: ["Job:fail:q"], result: ["Job:fail:r"])
 }
 
-"任务流"
-type TaskFlow {
-    "任务流全局唯一id"
-    id: ID! @query @upsert
-    # @auth(query: ["A:q", "Task:id:q"], result: ["A:r", "Task:id:r"])
-    "任务"
-    tasks: [Task!]! @query @upsert
-    "任务是否激活"
-    enabled: Boolean @query @upsert
-    # @auth(query: ["A:q", "Task:enabled:q"], result: ["A:r", "Task:enabled:r"])
-    "任务优先级，一般为0，数字越大优先级越高"
-    priority: Int @query @upsert
-    "任务执行有效时间; 如果没有设定该值，则认为 Task 长期有效"
-    # @auth(query: ["A:q", "Task:priority:q"], result: ["A:r", "Task:priority:r"])
-    validBefore: DateTime @query @upsert
-    "任务开始有效执行时间; 如果没有设定该值，则认为 Task 长期有效"
-    validAfter: DateTime @query @upsert
-}
-
 enum JobStatus {
     "等待调度状态，通常是任务分发子任务时，系统还未来得及调度时任务的状态"
     PENDING
@@ -346,30 +328,6 @@ type JobTrial {
 type JobFailStatus {
     code: String @query
     message: String @query
-}
-
-type TaskConfig {
-    "任务业务域"
-    domain: String! @query @upsert
-    "任务类型，决定了任务的执行逻辑"
-    type: String! @query @upsert
-    "任务参数，具体有哪些参数跟任务类型有关"
-    params: JSONObject @query @upsert
-    "任务初始上下文，建议尽量不指定"
-    context: JSONObject @query @upsert
-    "任务优先级，一般为0，数字越大优先级越高"
-    priority: Int @query @upsert
-    "延迟执行的时间间隔，单位秒，如果没有设定该值，默认会参照TaskTypeConfig.delay"
-    delay: Float @query @upsert
-    """
-    任务启动时，默认延迟执行的时间的随机抖动系数。
-    0~1之间，0表示不抖动，1则表示延迟时间在[0, 2 x 默认延迟时间]随机取值。
-    """
-    delayRandomize: Float @query @upsert
-    "任务实例失败时，默认最大重试次数。为0则不重试。"
-    retry: Int @query @upsert
-    "任务实例重试随着次数增多，每次重试实例延迟执行的时间基于delay指数放大，此为放大倍数。"
-    retryDelayFactor: Float @query @upsert
 }
 
 type TaskSchedulingConfig {
