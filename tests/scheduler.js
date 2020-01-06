@@ -111,8 +111,7 @@ describe('Scheduler', () => {
             expect(await operations.jobs.findOne({_id: j7})).toStrictEqual({_id: j7, status: 'DELAYED'});
         }
 
-        await scheduler1.stop();
-        await scheduler2._clearDeadSchedulers();
+        await scheduler1._stop();
 
         expect(await operations.tasks.findOne({_id: t1})).toStrictEqual({_id: t1, lockedBy: null});
         expect(await operations.tasks.findOne({_id: t2})).toStrictEqual({_id: t2, lockedBy: null});
