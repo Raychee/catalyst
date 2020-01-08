@@ -89,7 +89,7 @@ describe('Job', () => {
             }
 
             if (trial < job.config.retry) {
-                expect(job.config.status).toBe('FAILED');
+                expect(job.config.status).toBe('RUNNING');
                 expect(t).toStrictEqual({
                     status: 'FAILED', fail: {code: 'test_code', message: `fail ${trial + 1} times`},
                     context: {i: trial + 1}, delay: 0,
@@ -157,10 +157,10 @@ describe('Job', () => {
             const {timeStarted: t1, timeStopped: t2, ...t} = job.config.trials[trial];
             const scheduled = await operations.jobs.find({domain: 'domain2', type: 'type2'}).toArray();
 
-            expect(job.config.status).toBe('FAILED');
             expect(scheduled).toHaveLength(trial + 1);
 
             if (trial < job.config.retry) {
+                expect(job.config.status).toBe('RUNNING');
                 expect(t).toStrictEqual({
                     status: 'FAILED', fail: {code: '_catch', message: 'caught'},
                     context: {i: trial + 1}, delay: 0,

@@ -39,8 +39,8 @@ describe('Operations', () => {
     describe('ensure task domains and types', () => {
         test('', async () => {
             const config = {
-                concurrency: 1, timeout: 0, delay: 0, delayRandomize: 0,
-                retry: 0, retryDelayFactor: 1, priority: 0, dedupWithin: 0, dedupRecent: true,
+                concurrency: 1, timeout: -1, delay: 0, delayRandomize: 0,
+                retry: 0, retryDelayFactor: 1, priority: 0, dedupWithin: -1, dedupRecent: true,
             };
 
             for (const [domainName, typeName] of [
@@ -137,8 +137,8 @@ describe('Operations', () => {
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
                 enabled: true, params: {p1: 123}, context: {},
-                timeout: 0, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: 0, dedupRecent: true,
+                timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
+                priority: 0, dedupWithin: -1, dedupRecent: true,
             });
             expect(i1).toBeTruthy();
             expect(l1).toBeUndefined();
@@ -149,8 +149,8 @@ describe('Operations', () => {
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
                 enabled: true, params: {p1: 123}, context: {},
-                timeout: 0, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: 0, dedupRecent: true,
+                timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
+                priority: 0, dedupWithin: -1, dedupRecent: true,
                 local: {
                     domain: 'B', type: 'x',
                     enabled: true, params: {p1: 123}, context: {}, validBefore: new Date('2019-01-01'),
@@ -168,8 +168,8 @@ describe('Operations', () => {
             const {_id: i1, timeCreated: t1, local: l1, ...j1} = job;
             expect(j1).toStrictEqual({
                 domain: 'B', type: 'x', delay: 2, params: {p1: 123}, context: {}, trials: [], status: 'PENDING',
-                task: taskBx._id, retry: 8, timeout: 0, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: 0, dedupRecent: true,
+                task: taskBx._id, retry: 8, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
+                priority: 0, dedupWithin: -1, dedupRecent: true,
             });
             expect(i1).toBeTruthy();
             expect(t1.getTime()).toBeGreaterThanOrEqual(now.getTime());
@@ -189,8 +189,8 @@ describe('Operations', () => {
             const {_id: i3, timeCreated: t3, local: l3, ...j3} = job;
             expect(j3).toStrictEqual({
                 domain: 'A', type: 'a', delay: 0, params: {}, context: {}, trials: [], status: 'PENDING',
-                task: taskBx._id, retry: 0, timeout: 0, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: 0, dedupRecent: true,
+                task: taskBx._id, retry: 0, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
+                priority: 0, dedupWithin: -1, dedupRecent: true,
             });
             expect(i3).toBeTruthy();
             expect(t3.getTime()).toBeGreaterThanOrEqual(now.getTime());
@@ -216,8 +216,8 @@ describe('Operations', () => {
             const {_id: i1, timeCreated: t1, local: l1, ...j1} = job;
             expect(j1).toStrictEqual({
                 domain: 'A', type :'b', delay: 30, params: {}, context: {}, trials: [], status: 'PENDING',
-                task: taskBx._id, retry: 9, timeout: 0, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: 0, dedupRecent: true,
+                task: taskBx._id, retry: 9, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
+                priority: 0, dedupWithin: -1, dedupRecent: true,
             });
             expect(i1).toBeTruthy();
             expect(t1.getTime()).toBeGreaterThanOrEqual(now.getTime());
@@ -263,15 +263,15 @@ describe('Operations', () => {
             taskBx = task;
 
             await operations.updateTasks({_id: taskBx._id}, {
-                delay: 15, subTasks: [{domain: 'A', type: 'b', dedupWithin: 10}]
+                delay: 15, subTasks: [{domain: 'A', type: 'b', timeout: 600}]
             });
             task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c6, mtime: m6, _id: i6, nextTime: n6, ...t6} = task;
             const {ctime: c7, mtime: m7, _id: i7, nextTime: n7, ...t7} = taskBx;
             expect(t6).toStrictEqual({
-                ...t7, delay: 15, subTasks: [{domain: 'A', type: 'b', delay: 30, dedupWithin: 10}],
+                ...t7, delay: 15, subTasks: [{domain: 'A', type: 'b', delay: 30, timeout: 600}],
                 local: {
-                    ...t7.local, delay: 15, subTasks: [{domain: 'A', type: 'b', dedupWithin: 10}],
+                    ...t7.local, delay: 15, subTasks: [{domain: 'A', type: 'b', timeout: 600}],
                 }
             });
             expect(m6.getTime()).toBeGreaterThanOrEqual(m7.getTime());
@@ -291,7 +291,7 @@ describe('Operations', () => {
             job = await operations.jobs.findOne({_id: jobAb._id});
             const {_id: i4, timeCreated: t41, local: {timeCreated: t42, ...l4}, ...j4} = job;
             const {_id: i5, timeCreated: t51, local: {timeCreated: t52, ...l5}, ...j5} = jobAb;
-            expect(j4).toStrictEqual({...j5, dedupWithin: 10, retry: 0});
+            expect(j4).toStrictEqual({...j5, timeout: 600, retry: 0});
             expect(l4).toStrictEqual(l5);
 
             jobAb = job;
@@ -301,7 +301,7 @@ describe('Operations', () => {
     describe('update a task with null values', () => {
         test('', async () => {
             await operations.updateTasks({_id: taskBx._id}, {
-                delay: null, subTasks: [{domain: 'A', type: 'b', dedupWithin: null}]
+                delay: null, subTasks: [{domain: 'A', type: 'b', timeout: null}]
             });
             const task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c, mtime: m, _id: i, local: l, nextTime: n, ...t} = task;
@@ -324,7 +324,7 @@ describe('Operations', () => {
             job = await operations.jobs.findOne({_id: jobAb._id});
             const {_id: i4, timeCreated: t41, local: {timeCreated: t42, ...l4}, ...j4} = job;
             const {_id: i5, timeCreated: t51, local: {timeCreated: t52, ...l5}, ...j5} = jobAb;
-            expect(j4).toStrictEqual({...j5, dedupWithin: 0});
+            expect(j4).toStrictEqual({...j5, timeout: -1});
             expect(l4).toStrictEqual(l5);
 
             jobAb = job;
@@ -607,6 +607,75 @@ describe('Operations', () => {
                 delay: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED'
             });
         })()).rejects.toThrow('field "interval" should be an Int >= 0 when "mode" is "REPEATED"')
+    });
+
+    test('insert duplicate jobs', async () => {
+        await operations.ensureDomain('dedup0');
+        await operations.ensureType('dedup0', 't1');
+        let t1 = await operations.insertTask({domain: 'dedup0', type: 't1', mode: 'ONCE', dedupWithin: 0});
+        let j1 = await operations.insertJob({task: t1._id, status: 'RUNNING'});
+        let j2 = await operations.insertJob({task: t1._id});
+        expect(j2).toBeUndefined();
+        const now = new Date();
+        await operations.updateJobs({_id: j1._id}, {status: 'SUCCESS', timeStopped: now});
+        j2 = await operations.insertJob({task: t1._id, timeCreated: now});
+        expect(j2).toBeUndefined();
+        j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1)});
+        expect(j2).toBeDefined();
+
+        await operations.ensureDomain('dedup0');
+        await operations.ensureType('dedup1', 't1');
+        t1 = await operations.insertTask({domain: 'dedup1', type: 't1', mode: 'ONCE', dedupWithin: 1});
+        j1 = await operations.insertJob({task: t1._id, status: 'DELAYED'});
+        j2 = await operations.insertJob({task: t1._id});
+        expect(j2).toBeUndefined();
+        await operations.updateJobs({_id: j1._id}, {status: 'SUCCESS', timeStopped: now});
+        j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 999)});
+        expect(j2).toBeUndefined();
+        j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1001)});
+        expect(j2).toBeDefined();
+
+        await operations.ensureDomain('dedupOld0');
+        await operations.ensureType('dedupOld0', 't1');
+        t1 = await operations.insertTask({domain: 'dedupOld0', type: 't1', mode: 'ONCE', dedupWithin: 0, dedupRecent: false});
+        j1 = await operations.insertJob({task: t1._id, status: 'DELAYED'});
+        j2 = await operations.insertJob({task: t1._id});
+        expect(j2).toBeDefined();
+        j1 = await operations.jobs.findOne({_id: j1._id});
+        expect(j1.status).toBe('CANCELED');
+        await operations.jobs.deleteOne({_id: j2._id});
+        await operations.updateJobs({_id: j1._id}, {status: 'SUCCESS', timeStopped: now});
+        j2 = await operations.insertJob({task: t1._id, timeCreated: now});
+        j1 = await operations.jobs.findOne({_id: j1._id});
+        expect(j1.status).toBe('SUCCESS');
+        await operations.jobs.deleteOne({_id: j2._id});
+        j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1)});
+        expect(j2).toBeDefined();
+        j1 = await operations.jobs.findOne({_id: j1._id});
+        expect(j1.status).toBe('SUCCESS');
+        await operations.jobs.deleteOne({_id: j2._id});
+
+        await operations.ensureDomain('dedupOld1');
+        await operations.ensureType('dedupOld1', 't1');
+        t1 = await operations.insertTask({domain: 'dedupOld1', type: 't1', mode: 'ONCE', dedupWithin: 1, dedupRecent: false});
+        j1 = await operations.insertJob({task: t1._id, status: 'DELAYED'});
+        j2 = await operations.insertJob({task: t1._id});
+        expect(j2).toBeDefined();
+        j1 = await operations.jobs.findOne({_id: j1._id});
+        expect(j1.status).toBe('CANCELED');
+        await operations.jobs.deleteOne({_id: j2._id});
+        await operations.updateJobs({_id: j1._id}, {status: 'PENDING', timeStopped: now});
+        j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 999)});
+        j1 = await operations.jobs.findOne({_id: j1._id});
+        expect(j1.status).toBe('CANCELED');
+        await operations.jobs.deleteOne({_id: j2._id});
+        await operations.updateJobs({_id: j1._id}, {status: 'PENDING', timeStopped: now});
+        j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1001)});
+        expect(j2).toBeDefined();
+        j1 = await operations.jobs.findOne({_id: j1._id});
+        expect(j1.status).toBe('CANCELED');
+        await operations.jobs.deleteOne({_id: j2._id});
+
     });
 
 });
