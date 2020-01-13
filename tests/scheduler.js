@@ -104,7 +104,7 @@ describe('Scheduler', () => {
             expect(await operations.tasks.findOne({_id: t5})).toStrictEqual({_id: t5, lockedBy: scheduler2.id});
             expect(await operations.jobs.findOne({_id: j1})).toStrictEqual({_id: j1, lockedBy: null, status: 'PENDING', local: {status: 'PENDING'}});
             expect(await operations.jobs.findOne({_id: j2})).toStrictEqual({_id: j2, lockedBy: null, status: 'PENDING', local: {status: 'PENDING'}});
-            expect(await operations.jobs.findOne({_id: j3})).toStrictEqual({_id: j3, lockedBy: s3, status: 'SUCCESS'});
+            expect(await operations.jobs.findOne({_id: j3})).toStrictEqual({_id: j3, lockedBy: null, status: 'SUCCESS'});
             expect(await operations.jobs.findOne({_id: j4})).toStrictEqual({_id: j4, lockedBy: scheduler1.id, status: 'RUNNING'});
             expect(await operations.jobs.findOne({_id: j5})).toStrictEqual({_id: j5, lockedBy: scheduler2.id, status: 'PENDING'});
             expect(await operations.jobs.findOne({_id: j6})).toStrictEqual({_id: j6, status: 'FAILED'});
@@ -120,7 +120,7 @@ describe('Scheduler', () => {
         expect(await operations.tasks.findOne({_id: t5})).toStrictEqual({_id: t5, lockedBy: scheduler2.id});
         expect(await operations.jobs.findOne({_id: j1})).toStrictEqual({_id: j1, lockedBy: null, status: 'PENDING', local: {status: 'PENDING'}});
         expect(await operations.jobs.findOne({_id: j2})).toStrictEqual({_id: j2, lockedBy: null, status: 'PENDING', local: {status: 'PENDING'}});
-        expect(await operations.jobs.findOne({_id: j3})).toStrictEqual({_id: j3, lockedBy: s3, status: 'SUCCESS'});
+        expect(await operations.jobs.findOne({_id: j3})).toStrictEqual({_id: j3, lockedBy: null, status: 'SUCCESS'});
         expect(await operations.jobs.findOne({_id: j4})).toStrictEqual({_id: j4, lockedBy: null, status: 'PENDING', local: {status: 'PENDING'}});
         expect(await operations.jobs.findOne({_id: j5})).toStrictEqual({_id: j5, lockedBy: scheduler2.id, status: 'PENDING'});
         expect(await operations.jobs.findOne({_id: j6})).toStrictEqual({_id: j6, status: 'FAILED'});
