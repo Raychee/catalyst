@@ -134,23 +134,23 @@ describe('Job', () => {
         await operations.ensureDomain('domain2');
         await operations.ensureType('domain2', 'type1');
         await operations.ensureType('domain2', 'type2');
-        await operations.updateDomains({domain: 'domain2'}, {retry: 2});
+        await operations.updateDomains({domain: 'domain2'}, {retry: 3});
         const taskConfig = await operations.insertTask({
             domain: 'domain2', type: 'type1', params: {v: 1}, mode: 'ONCE'
         });
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        expect(jobConfig.retry).toBe(2);
+        expect(jobConfig.retry).toBe(3);
 
         const job = new Job(jobConfig, taskType, undefined, operations);
 
-        for (let trial = 0; trial <= job.config.retry; trial++) {
+        for (let trial = 0; trial <= 2; trial++) {
             job._timeout = false;
             job.config.trials.push({});
             try {
                 await job._executeTrial();
             } catch (e) {
-                expect(trial).toBe(job.config.retry);
+                expect(trial).toBe(2);
                 expect(e.name).toBe('CatchableError');
                 expect(e.error.message).toBe('crash');
             }
@@ -159,14 +159,14 @@ describe('Job', () => {
 
             expect(scheduled).toHaveLength(trial + 1);
 
-            if (trial < job.config.retry) {
+            if (trial < 2) {
                 expect(job.config.status).toBe('RUNNING');
                 expect(t).toStrictEqual({
                     status: 'FAILED', fail: {code: '_catch', message: 'caught'},
                     context: {i: trial + 1}, delay: 0,
                 });
                 expect(job.config.fail).toStrictEqual({code: '_catch', message: 'caught'});
-                expect(scheduled[trial]).toMatchObject({domain: 'domain2', type: 'type2', params: {e: ''}, retry: 2});
+                expect(scheduled[trial]).toMatchObject({domain: 'domain2', type: 'type2', params: {e: ''}, retry: 3});
             } else {
                 expect(job.config.status).toBe('FAILED');
                 expect(t).toStrictEqual({
@@ -178,7 +178,7 @@ describe('Job', () => {
                     domain: 'domain2',
                     type: 'type2',
                     params: {e: 'crash'},
-                    retry: 2
+                    retry: 3
                 });
             }
         }
