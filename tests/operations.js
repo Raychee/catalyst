@@ -615,32 +615,32 @@ describe('Operations', () => {
         let t1 = await operations.insertTask({domain: 'dedup0', type: 't1', mode: 'ONCE', dedupWithin: 0});
         let j1 = await operations.insertJob({task: t1._id, status: 'RUNNING'});
         let j2 = await operations.insertJob({task: t1._id});
-        expect(j2).toBeUndefined();
+        expect(j2).toStrictEqual(j1);
         const now = new Date();
         await operations.updateJobs({_id: j1._id}, {status: 'SUCCESS', timeStopped: now});
         j2 = await operations.insertJob({task: t1._id, timeCreated: now});
-        expect(j2).toBeUndefined();
+        expect(j2._id).toEqual(j1._id);
         j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1)});
-        expect(j2).toBeDefined();
+        expect(j2._id).not.toEqual(j1._id);
 
         await operations.ensureDomain('dedup0');
         await operations.ensureType('dedup1', 't1');
         t1 = await operations.insertTask({domain: 'dedup1', type: 't1', mode: 'ONCE', dedupWithin: 1});
         j1 = await operations.insertJob({task: t1._id, status: 'DELAYED'});
         j2 = await operations.insertJob({task: t1._id});
-        expect(j2).toBeUndefined();
+        expect(j2).toStrictEqual(j1);
         await operations.updateJobs({_id: j1._id}, {status: 'SUCCESS', timeStopped: now});
         j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 999)});
-        expect(j2).toBeUndefined();
+        expect(j2._id).toEqual(j1._id);
         j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1001)});
-        expect(j2).toBeDefined();
+        expect(j2._id).not.toEqual(j1._id);
 
         await operations.ensureDomain('dedupOld0');
         await operations.ensureType('dedupOld0', 't1');
         t1 = await operations.insertTask({domain: 'dedupOld0', type: 't1', mode: 'ONCE', dedupWithin: 0, dedupRecent: false});
         j1 = await operations.insertJob({task: t1._id, status: 'DELAYED'});
         j2 = await operations.insertJob({task: t1._id});
-        expect(j2).toBeDefined();
+        expect(j2._id).not.toEqual(j1._id);
         j1 = await operations.jobs.findOne({_id: j1._id});
         expect(j1.status).toBe('CANCELED');
         await operations.jobs.deleteOne({_id: j2._id});
@@ -650,7 +650,7 @@ describe('Operations', () => {
         expect(j1.status).toBe('SUCCESS');
         await operations.jobs.deleteOne({_id: j2._id});
         j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1)});
-        expect(j2).toBeDefined();
+        expect(j2._id).not.toEqual(j1._id);
         j1 = await operations.jobs.findOne({_id: j1._id});
         expect(j1.status).toBe('SUCCESS');
         await operations.jobs.deleteOne({_id: j2._id});
@@ -660,7 +660,7 @@ describe('Operations', () => {
         t1 = await operations.insertTask({domain: 'dedupOld1', type: 't1', mode: 'ONCE', dedupWithin: 1, dedupRecent: false});
         j1 = await operations.insertJob({task: t1._id, status: 'DELAYED'});
         j2 = await operations.insertJob({task: t1._id});
-        expect(j2).toBeDefined();
+        expect(j2._id).not.toEqual(j1._id);
         j1 = await operations.jobs.findOne({_id: j1._id});
         expect(j1.status).toBe('CANCELED');
         await operations.jobs.deleteOne({_id: j2._id});
@@ -671,7 +671,7 @@ describe('Operations', () => {
         await operations.jobs.deleteOne({_id: j2._id});
         await operations.updateJobs({_id: j1._id}, {status: 'PENDING', timeStopped: now});
         j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1001)});
-        expect(j2).toBeDefined();
+        expect(j2._id).not.toEqual(j1._id);
         j1 = await operations.jobs.findOne({_id: j1._id});
         expect(j1.status).toBe('CANCELED');
         await operations.jobs.deleteOne({_id: j2._id});
