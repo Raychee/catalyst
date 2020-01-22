@@ -310,7 +310,7 @@ describe('Job', () => {
         });
     });
 
-    test('run a job that waits for another job', async () => {
+    test('run a job that waits for another job that succeeds', async () => {
         const taskDomain = new TaskDomain('domain7');
         const taskType = new TaskType(taskDomain, 'type1');
         await taskType.load({
@@ -337,12 +337,46 @@ describe('Job', () => {
         expect(scheduled1).toHaveLength(1);
         expect(scheduled1[0].params).toStrictEqual({v: 1});
         expect(scheduled1[0].status).toBe('PENDING');
-        await operations.updateJobs({_id: scheduled1[0]._id}, {status: 'FAILED'});
+        await operations.updateJobs({_id: scheduled1[0]._id}, {status: 'SUCCESS'});
         await running;
         expect(job.config.status).toBe('SUCCESS');
         const scheduled2 = await operations.jobs.find({domain: 'domain7', type: 'type3'}).toArray();
         expect(scheduled2).toHaveLength(1);
-        expect(scheduled2[0].params.finished).toMatchObject({_id: scheduled1[0]._id, params: {v: 1}, status: 'FAILED'});
+        expect(scheduled2[0].params.finished).toMatchObject({_id: scheduled1[0]._id, params: {v: 1}, status: 'SUCCESS'});
+    });
+
+    test('run a job that waits for another job that fails', async () => {
+        const taskDomain = new TaskDomain('domain8');
+        const taskType = new TaskType(taskDomain, 'type1');
+        await taskType.load({
+            async run() {
+                const newJob = await this.schedule('domain8.type2', {v: 1});
+                const finishedJob = await this.wait(newJob);
+                await this.schedule('domain8.type3', {finished: finishedJob});
+            }
+        });
+
+        await operations.ensureDomain('domain8');
+        await operations.ensureType('domain8', 'type1');
+        await operations.ensureType('domain8', 'type2');
+        await operations.ensureType('domain8', 'type3');
+        const taskConfig = await operations.insertTask({domain: 'domain8', type: 'type1', mode: 'ONCE'});
+        const jobConfig = await operations.insertJob({task: taskConfig._id});
+
+        const job = new Job(jobConfig, taskType, undefined, operations);
+
+        const running = job._execute();
+        await sleep(1500);
+        expect(job.config.status).toBe('RUNNING');
+        const scheduled1 = await operations.jobs.find({domain: 'domain8', type: 'type2'}).toArray();
+        expect(scheduled1).toHaveLength(1);
+        expect(scheduled1[0].params).toStrictEqual({v: 1});
+        expect(scheduled1[0].status).toBe('PENDING');
+        await operations.updateJobs({_id: scheduled1[0]._id}, {status: 'FAILED'});
+        await running;
+        expect(job.config.status).toBe('FAILED');
+        const scheduled2 = await operations.jobs.find({domain: 'domain8', type: 'type3'}).toArray();
+        expect(scheduled2).toHaveLength(0);
     });
 
 });
