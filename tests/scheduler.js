@@ -149,7 +149,7 @@ describe('Scheduler', () => {
         );
         await scheduler1._activate();
 
-        const {insertedId: j1} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: 0, lockedBy: scheduler1.id});
+        const {insertedId: j1} = await operations.jobs.insertOne({status: 'RUNNING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: 0, lockedBy: scheduler1.id});
         const {insertedId: j2} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: -1});
         const {insertedId: j3} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: 0});
         const {insertedId: j4} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency3', type: 'typeCurrency1', priority: 1});
