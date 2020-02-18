@@ -132,30 +132,31 @@ describe('Operations', () => {
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
                 params: {p1: 123}
             });
-            const {ctime: c1, mtime: m1, _id: i1, local: l1, nextTime: n1, ...t1} = taskBx;
+            const {ctime: c1, mtime: m1, _id: i1, local: l1, ...t1} = taskBx;
             expect(t1).toStrictEqual({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
                 enabled: true, params: {p1: 123}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
+                nextTime: new Date(0),
             });
             expect(i1).toBeTruthy();
             expect(l1).toBeUndefined();
-            expect(n1.getTime()).toBeGreaterThanOrEqual(now.getTime());
             taskBx = await operations.tasks.findOne({_id: taskBx._id});
-            const {ctime: c2, mtime: m2, _id: i2, nextTime: n2, ...t2} = taskBx;
+            const {ctime: c2, mtime: m2, _id: i2, ...t2} = taskBx;
             expect(t2).toStrictEqual({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
                 enabled: true, params: {p1: 123}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
+                nextTime: new Date(0),
                 local: {
                     domain: 'B', type: 'x',
                     enabled: true, params: {p1: 123}, context: {}, validBefore: new Date('2019-01-01'),
                     subTasks: [{domain: 'A', type: 'b', retry: 9}], mode: 'ONCE', retry: 8,
-                    nextTime: n2,
+                    nextTime: new Date(0),
                 }
             });
         });

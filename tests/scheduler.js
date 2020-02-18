@@ -177,24 +177,24 @@ describe('Scheduler', () => {
         await operations.ensureDomain('domain');
         await operations.ensureType('domain', 'type');
 
-        const t1 = await operations.insertTask({
+        let t1 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'ONCE'
         });
-        const t2 = await operations.insertTask({
+        let t2 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'REPEATED', interval: 10
         });
-        const t3 = await operations.insertTask({
+        let t3 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *'
         });
-        const t4 = await operations.insertTask({
+        let t4 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
             validBefore: new Date(Date.now() - 10000)
         });
-        const t5 = await operations.insertTask({
+        let t5 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
             validAfter: new Date(Date.now() + 10000)
         });
-        const t6 = await operations.insertTask({
+        let t6 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
             validAfter: new Date(Date.now() + 10000), enabled: false
         });
@@ -205,7 +205,7 @@ describe('Scheduler', () => {
 
         await scheduler._activate();
 
-        const now = t3.nextTime;
+        const now = new Date();
         const minutes = now.getMinutes();
         let nextTime = new Date(now.getTime());
         nextTime.setMinutes(10, 0, 0);
@@ -214,22 +214,26 @@ describe('Scheduler', () => {
         }
         await scheduler._scheduleTasks();
 
-        expect(await operations.tasks.findOne({_id: t1._id})).toMatchObject({
-            lockedBy: null, lastTime: t1.nextTime, nextTime: null
-        });
-        expect(await operations.tasks.findOne({_id: t2._id})).toMatchObject({
-            lockedBy: null, lastTime: t2.nextTime, nextTime: new Date(t2.nextTime.getTime() + 10 * 1000)
-        });
-        expect(await operations.tasks.findOne({_id: t3._id})).toMatchObject({
-            lockedBy: null, lastTime: t3.nextTime, nextTime
-        });
+        t1 = await operations.tasks.findOne({_id: t1._id});
+        expect(t1).toMatchObject({lockedBy: null, nextTime: null});
+        expect(Math.abs(t1.lastTime - now)).toBeLessThan(1000);
+
+        t2 = await operations.tasks.findOne({_id: t2._id});
+        expect(t2).toMatchObject({lockedBy: null});
+        expect(Math.abs(t2.lastTime - now)).toBeLessThan(1000);
+        expect(Math.abs(t2.nextTime - 10 * 1000 - now)).toBeLessThan(1000);
+
+        t3 = await operations.tasks.findOne({_id: t3._id});
+        expect(t3).toMatchObject({lockedBy: null, nextTime});
+        expect(Math.abs(t3.lastTime - now)).toBeLessThan(1000);
+
         expect(await operations.tasks.findOne({_id: t4._id})).toMatchObject({nextTime: t4.nextTime});
         expect(await operations.tasks.findOne({_id: t5._id})).toMatchObject({nextTime: t5.nextTime});
         expect(await operations.tasks.findOne({_id: t6._id})).toMatchObject({nextTime: t6.nextTime});
 
         expect(await operations.jobs.countDocuments({task: t1._id})).toBe(1);
         expect(await operations.jobs.countDocuments({task: t2._id})).toBe(1);
-        expect(await operations.jobs.countDocuments({task: t3._id})).toBe(1);
+        expect(await operations.jobs.countDocuments({task: t3._id})).toBe(0);
 
     });
 

@@ -286,27 +286,29 @@ describe('Job', () => {
         const taskType = new TaskType(taskDomain, 'type1');
         await taskType.load({
             async run() {
-                await this.delay(2);
+                if (this.config.trials.length <= 1) {
+                    await this.delay(2);
+                }
             }
         });
 
         await operations.ensureDomain('domain6');
         await operations.ensureType('domain6', 'type1');
-        await operations.updateDomains({domain: 'domain6'}, {timeout: 1});
+        await operations.updateDomains({domain: 'domain6'}, {retry: 3, timeout: 1});
         const taskConfig = await operations.insertTask({domain: 'domain6', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
         const job = new Job(jobConfig, taskType, undefined, operations);
 
         await job._execute();
-        expect(job.config.status).toBe('FAILED');
-        expect(job.config.fail).toStrictEqual({
-            code: '_timeout', message: 'Job execution time exceeds 1 seconds and is terminated.'
-        });
-        expect(job.config.trials).toHaveLength(1);
+        expect(job.config.status).toBe('SUCCESS');
+        expect(job.config.trials).toHaveLength(2);
         expect(job.config.trials[0]).toMatchObject({
             status: 'FAILED', delay: 0,
             fail: {code: '_timeout', message: 'Job execution time exceeds 1 seconds and is terminated.'}
+        });
+        expect(job.config.trials[1]).toMatchObject({
+            status: 'SUCCESS', delay: 0,
         });
     });
 
