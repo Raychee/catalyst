@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.4.40",
+  "version": "0.4.41",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -40,7 +40,7 @@
     "mongodb": "^3.3.0",
     "neo4j-driver": "^4.0.0",
     "node-fetch": "^2.6.0",
-    "puppeteer-core": "^1.15.0",
+    "puppeteer-core": "chrome-stable",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.7",
     "supports-color": "^7.1.0",
