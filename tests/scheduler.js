@@ -198,12 +198,25 @@ describe('Scheduler', () => {
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
             validAfter: new Date(Date.now() + 10000), enabled: false
         });
+        const t7LastTime = new Date(Date.now() - 30 * 60 * 1000);
+        let t7 = await operations.insertTask({
+            domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
+            lastTime: t7LastTime,
+        });
+        let t8LastTime = new Date();
+        t8LastTime.setSeconds(0, 0);
+        let t8NextTime = new Date(t8LastTime.getTime() + 60 * 1000);
+        let t8 = await operations.insertTask({
+            domain: 'domain', type: 'type', mode: 'REPEATED', interval: 60,
+            lastTime: new Date(t8LastTime.getTime() - 3 * 60 * 1000),
+        });
 
         const scheduler = new Scheduler(
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
 
         await scheduler._activate();
+        await scheduler._scheduleTasks();
 
         const now = new Date();
         const minutes = now.getMinutes();
@@ -212,7 +225,6 @@ describe('Scheduler', () => {
         if (minutes >= 10) {
             nextTime = new Date(nextTime.getTime() + 60 * 60 * 1000);
         }
-        await scheduler._scheduleTasks();
 
         t1 = await operations.tasks.findOne({_id: t1._id});
         expect(t1).toMatchObject({lockedBy: null, nextTime: null});
@@ -230,10 +242,17 @@ describe('Scheduler', () => {
         expect(await operations.tasks.findOne({_id: t4._id})).toMatchObject({nextTime: t4.nextTime});
         expect(await operations.tasks.findOne({_id: t5._id})).toMatchObject({nextTime: t5.nextTime});
         expect(await operations.tasks.findOne({_id: t6._id})).toMatchObject({nextTime: t6.nextTime});
+        expect(await operations.tasks.findOne({_id: t7._id})).toMatchObject({lastTime: t7LastTime, nextTime});
+        expect(await operations.tasks.findOne({_id: t8._id})).toMatchObject({lastTime: t8LastTime, nextTime: t8NextTime});
 
         expect(await operations.jobs.countDocuments({task: t1._id})).toBe(1);
         expect(await operations.jobs.countDocuments({task: t2._id})).toBe(1);
         expect(await operations.jobs.countDocuments({task: t3._id})).toBe(0);
+        expect(await operations.jobs.countDocuments({task: t4._id})).toBe(0);
+        expect(await operations.jobs.countDocuments({task: t5._id})).toBe(0);
+        expect(await operations.jobs.countDocuments({task: t6._id})).toBe(0);
+        expect(await operations.jobs.countDocuments({task: t7._id})).toBe(0);
+        expect(await operations.jobs.countDocuments({task: t8._id})).toBe(0);
 
     });
 

@@ -126,16 +126,15 @@ describe('Operations', () => {
 
     describe('insert a valid task', () => {
         test('', async () => {
-            const now = new Date();
             taskBx = await operations.insertTask({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
-                retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
+                retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 params: {p1: 123}
             });
             const {ctime: c1, mtime: m1, _id: i1, local: l1, ...t1} = taskBx;
             expect(t1).toStrictEqual({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
-                retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
+                retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 enabled: true, params: {p1: 123}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
@@ -147,7 +146,7 @@ describe('Operations', () => {
             const {ctime: c2, mtime: m2, _id: i2, ...t2} = taskBx;
             expect(t2).toStrictEqual({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
-                retry: 8, validBefore: new Date('2019-01-01'), mode: 'ONCE',
+                retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 enabled: true, params: {p1: 123}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
@@ -155,7 +154,7 @@ describe('Operations', () => {
                 local: {
                     domain: 'B', type: 'x',
                     enabled: true, params: {p1: 123}, context: {}, validBefore: new Date('2019-01-01'),
-                    subTasks: [{domain: 'A', type: 'b', retry: 9}], mode: 'ONCE', retry: 8,
+                    subTasks: [{domain: 'A', type: 'b', retry: 9}], mode: 'REPEATED', interval: 30, retry: 8,
                     nextTime: new Date(0),
                 }
             });
@@ -252,14 +251,15 @@ describe('Operations', () => {
 
     describe('update a task with non-null values', () => {
         test('', async () => {
-            await operations.updateTasks({_id: taskBx._id}, {delay: 21});
+            await operations.updateTasks({_id: taskBx._id}, {delay: 21, interval: 50});
             let task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c1, mtime: m1, _id: i1, nextTime: n1, ...t1} = task;
             const {ctime: c8, mtime: m8, _id: i8, nextTime: n8, ...t8} = taskBx;
-            expect(t1).toStrictEqual({...t8, delay: 21, local: {...t8.local, delay: 21}});
+            expect(t1).toStrictEqual({...t8, delay: 21, interval: 50, local: {...t8.local, delay: 21, interval: 50}});
             expect(m1.getTime()).toBeGreaterThanOrEqual(m8.getTime());
             expect(c1.getTime()).toBe(c8.getTime());
             expect(i1).toEqual(i8);
+            expect(n1.getTime()).toBe(0);
 
             taskBx = task;
 
