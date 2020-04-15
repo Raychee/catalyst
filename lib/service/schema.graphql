@@ -7,7 +7,6 @@ directive @query on FIELD_DEFINITION
 directive @upsert on FIELD_DEFINITION
 directive @result on FIELD_DEFINITION
 directive @jwt(secret: String!, algorithm: String, expiresIn: Int, notBefore: Int) on SCHEMA
-directive @auth(query: [String!], upsert: [String!], result: [String!], silent: Boolean = true) on OBJECT | FIELD_DEFINITION
 
 
 schema @jwt(secret: "${secret}", expiresIn: 1800) {
@@ -34,7 +33,7 @@ type Mutation {
 }
 
 
-type Domain { # @auth(query: ["B:q","TaskDomainConfig:q"], upsert: ["B:u", "TaskDomainConfig:u"], result: ["B:r", "TaskDomainConfig:r"]){
+type Domain {
     "任务业务域"
     domain: String! @query @upsert
     "该业务域下所有类型的任务整体最大并发数限制，<=0为不限制"
@@ -68,7 +67,7 @@ type Domain { # @auth(query: ["B:q","TaskDomainConfig:q"], upsert: ["B:u", "Task
 }
 
 "任务类型级别的配置"
-type Type { # @auth(query: ["B:q", "TaskTypeConfig:q"], upsert: ["B:u", "TaskTypeConfig:u"], result: ["B:r", "TaskTypeConfig:r"]){
+type Type {
     "任务业务域"
     domain: String! @query @upsert
     "任务类型"
@@ -114,32 +113,24 @@ type Type { # @auth(query: ["B:q", "TaskTypeConfig:q"], upsert: ["B:u", "TaskTyp
 type Task {
     "任务全局唯一id"
     id: ID! @query @upsert
-    # @auth(query: ["A:q", "Task:id:q"], result: ["A:r", "Task:id:r"])
     "任务业务域"
     domain: String! @query @upsert
-    # @auth(query: ["A:q", "Task:domain:q"], result: ["A:r", "Task:domain:r"])
     "任务类型，决定了任务的执行逻辑"
     type: String! @query @upsert
-    # @auth(query: ["A:q", "Task:type:q"], result: ["A:r", "Task:type:r"])
     "任务是否激活"
     enabled: Boolean @query @upsert
-    # @auth(query: ["A:q", "Task:enabled:q"], result: ["A:r", "Task:enabled:r"])
     "任务参数，具体有哪些参数跟任务类型有关"
     params: JSONObject @query @upsert
-    # @auth(query: ["A:q", "Task:params:q"], result: ["A:r", "Task:params:r"])
     "任务初始上下文，建议尽量不指定"
     context: JSONObject @query @upsert
-    # @auth(query: ["A:q", "Task:context:q"], result: ["A:r", "Task:context:r"])
     "任务优先级，一般为0，数字越大优先级越高"
     priority: Int @query @upsert
     "任务执行有效时间; 如果没有设定该值，则认为 Task 长期有效"
-    # @auth(query: ["A:q", "Task:priority:q"], result: ["A:r", "Task:priority:r"])
     validBefore: DateTime @query @upsert
     "任务开始有效执行时间; 如果没有设定该值，则认为 Task 长期有效"
     validAfter: DateTime @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
-    # @auth(query: ["A:q", "Task:dedupWithin:q"], result: ["A:r", "Task:dedupWithin:r"])
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
@@ -149,19 +140,15 @@ type Task {
     timeout: Int @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
     delay: Float @query @upsert
-    # @auth(query: ["A:q", "Task:delay:q"], result: ["A:r", "Task:delay:r"])
     """
     任务启动时，默认延迟执行的时间的随机抖动系数。
     0~1之间，0表示不抖动，1则表示延迟时间在[0, 2 x 默认延迟时间]随机取值。
     """
     delayRandomize: Float @query @upsert
-    # @auth(query: ["A:q", "Task:delayRandomize:q"], result: ["A:r", "Task:delayRandomize:r"])
     "任务实例失败时，默认最大重试次数。为0则不重试。"
     retry: Int @query @upsert
-    # @auth(query: ["A:q", "Task:retry:q"], result: ["A:r", "Task:retry:r"])
     "任务实例重试随着次数增多，每次重试实例延迟执行的时间基于delay指数放大，此为放大倍数。"
     retryDelayFactor: Float @query @upsert
-    # @auth(query: ["A:q", "Task:retryDelayFactor:q"], result: ["A:r", "Task:retryDelayFactor:r"])
     """
     子任务调度参数。
     当该任务类型的执行逻辑包含分发其它类型的子任务时，指定子任务的延迟时间、重试次数等。
@@ -169,17 +156,13 @@ type Task {
     这里设定的参数对以此任务为起始的整个调用链均有效。
     """
     subTasks: [TaskSchedulingConfig!] @query @upsert
-    # @auth(query: ["A:q", "Task:subTasks:q"], result: ["A:r", "Task:subTasks:r"])
 
     "任务调度类型"
     mode: TaskMode! @query @upsert
-    # @auth(query: ["A:q", "Task:mode:q"], result: ["A:r", "Task:mode:r"])
     "对于重复性任务（type=REPEATED），重复的周期间隔，单位秒"
     interval: Int @query @upsert
-    # @auth(query: ["A:q", "Task:interval:q"], result: ["A:r", "Task:interval:r"])
     "对于定时任务（type=SCHEDULED），定时设置，是一个标准cron字符串"
     schedule: String @query @upsert
-    # @auth(query: ["A:q", "Task:schedule:q"], result: ["A:r", "Task:schedule:r"])
 
     "对于定时任务（type=SCHEDULED），定时的时区"
     timezone: String @query @upsert
@@ -193,10 +176,8 @@ type Task {
 
     "任务创建时间"
     ctime: DateTime @query
-    # @auth(query: ["A:q", "Task:ctime:q"], result: ["A:r", "Task:ctime:r"])
     "任务修改时间"
     mtime: DateTime @query
-    # @auth(query: ["A:q", "Task:mtime:q"], result: ["A:r", "Task:mtime:r"])
 }
 
 "任务调度类型"
@@ -211,28 +192,21 @@ enum TaskMode {
 
 
 "任务实例，指特定的一次任务的执行"
-type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
+type Job {
     "任务实例全局唯一id"
     id: ID! @query @upsert
-    # @auth(query: ["Job:id:q"], result: ["Job:id:r"])
     "任务业务域"
     domain: String! @query
-    # @auth(query: ["Job:domain:q"], result: ["Job:domain:r"])
     "任务类型，决定了任务的执行逻辑"
     type: String! @query
-    # @auth(query: ["Job:type:q"], result: ["Job:type:r"])
     "任务参数，具体有哪些参数跟任务类型有关"
     params: JSONObject @query
-    # @auth(query: ["Job:params:q"], result: ["Job:params:r"])
     "任务上下文"
     context: JSONObject @query
-    # @auth(query: ["Job:context:q"], result: ["Job:context:r"])
     "任务实例的优先级"
     priority: Int @query @upsert
-    # @auth(query: ["Job:priority:q"], result: ["Job:priority:r"])
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
-    # @auth(query: ["Job:dedupWithin:q"], result: ["Job:dedupWithin:r"])
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
@@ -242,19 +216,15 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     timeout: Int @query @upsert
     "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
     delay: Float @query @upsert
-    # @auth(query: ["Job:delay:q"], result: ["Job:delay:r"])
     """
     任务启动时，默认延迟执行的时间的随机抖动系数。
     0~1之间，0表示不抖动，1则表示延迟时间在[0, 2 x 默认延迟时间]随机取值。
     """
     delayRandomize: Float @query @upsert
-    # @auth(query: ["Job:delayRandomize:q"], result: ["Job:delayRandomize:r"])
     "任务实例失败时，默认最大重试次数。为0则不重试。"
     retry: Int @query @upsert
-    # @auth(query: ["Job:retry:q"], result: ["Job:retry:r"])
     "任务实例重试随着次数增多，每次重试实例延迟执行的时间基于delay指数放大，此为放大倍数。"
     retryDelayFactor: Float @query @upsert
-    # @auth(query: ["Job:retryDelayFactor:q"], result: ["Job:retryDelayFactor:r"])
 
     """
     实例对应的任务。
@@ -262,36 +232,27 @@ type Job { # @auth(query: ["Job:q"], upsert: ["Job:u"], result: ["Job:r"]) {
     如果该实例是由别的任务实例创建，那么此字段指向的是实例创建链中最源头的实例所对应的任务。
     """
     task: Task! @query
-    # @auth(query: ["Job:task:q"], result: ["Job:task:r"])
     "如果该实例是由别的任务实例创建，此字段表明直接创建它的任务实例；其他情况下为空。"
     createdBy: Job @query
-    # @auth(query: ["Job:createdBy:q"], result: ["Job:createdBy:r"])
     """
     实例运行的最初来源的任务实例。
     如果该实例是由别的任务实例创建（createdBy不为空），则这里标记任务创建链中最源头的任务实例；其他情况下为空。
     """
     createdFrom: Job @query
-    # @auth(query: ["Job:createdFrom:q"], result: ["Job:createdFrom:r"])
 
     "任务状态"
     status: JobStatus @query @upsert
-    # @auth(query: ["Job:status:q"], result: ["Job:status:r"])
     "任务执行（包括每次重试）的具体状态"
     trials: [JobTrial!]
-    # @auth(query: ["Job:trials:q"], result: ["Job:trials:r"])
     "任务创建时间"
     timeCreated: DateTime @query
-    # @auth(query: ["Job:timeCreated:q"], result: ["Job:timeCreated:r"])
     "任务真正开始执行的时间（如果任务配置有delay，则delay不计在内）"
     timeStarted: DateTime @query
-    # @auth(query: ["Job:timeStarted:q"], result: ["Job:timeStarted:r"])
     "任务结束的时间。结束包括失败成功"
     timeStopped: DateTime @query
-    # @auth(query: ["Job:timeStopped:q"], result: ["Job:timeStopped:r"])
 
     "任务失败的代码和描述信息，任务成功则为空"
     fail: JobFailStatus @query
-    # @auth(query: ["Job:fail:q"], result: ["Job:fail:r"])
 }
 
 enum JobStatus {
