@@ -6,6 +6,7 @@ directive @page on FIELD_DEFINITION
 directive @query on FIELD_DEFINITION
 directive @upsert on FIELD_DEFINITION
 directive @result on FIELD_DEFINITION
+directive @batch on FIELD_DEFINITION
 directive @jwt(secret: String!, algorithm: String, expiresIn: Int, notBefore: Int) on SCHEMA
 
 
@@ -16,10 +17,10 @@ schema @jwt(secret: "${secret}", expiresIn: 1800) {
 
 type Query {
 
-    Domain: [Domain!]! @result @sort @page
-    Type: [Type!]! @result @sort @page
-    Task: [Task!]! @result @sort @page
-    Job: [Job!]! @result @sort @page
+    Domain: [Domain!]! @result @batch @sort @page
+    Type: [Type!]! @result @batch @sort @page
+    Task: [Task!]! @result @batch @sort @page
+    Job: [Job!]! @result @batch @sort @page
 
 }
 
