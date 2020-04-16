@@ -167,13 +167,13 @@ type Task {
 
     "对于定时任务（type=SCHEDULED），定时的时区"
     timezone: String @query @upsert
-#   @auth(query: ["A:q", "Task:timezone:q"], result: ["A:r", "Task:timezone:r"])
     "下一次执行时间"
     nextTime: DateTime @query
-#     @auth(query: ["A:q", "Task:nextTime:q"], result: ["A:r", "Task:nextTime:r"])
     "上一次执行时间"
     lastTime: DateTime @query
-#    @auth(query: ["A:q", "Task:lastTime:q"], result: ["A:r", "Task:lastTime:r"])
+
+    "创建任务的用户ID"
+    user: String @query @upsert
 
     "任务创建时间"
     ctime: DateTime @query

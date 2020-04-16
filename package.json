@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.4.58",
+  "version": "0.4.59",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -30,12 +30,13 @@
     "debug": "^4.1.1",
     "deep-object-diff": "^1.1.0",
     "graphql": "^14.4.2",
-    "graphql-augment": "^0.5.3",
+    "graphql-augment": "^0.5.4",
     "graphql-tag": "latest",
     "graphql-tools": "latest",
     "graphql-type-json": "^0.3.0",
     "json-stable-stringify": "^1.0.1",
     "koa": "^2.7.0",
+    "koa-bodyparser": "^4.3.0",
     "lodash": "^4.17.15",
     "moment": "^2.24.0",
     "mongodb": "^3.3.0",
