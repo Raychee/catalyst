@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.4.59",
+  "version": "0.4.60",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -16,7 +16,7 @@
   "homepage": "https://github.com/Raychee/catalyst#readme",
   "dependencies": {
     "@elastic/elasticsearch": "^7.6.0",
-    "@raychee/utils": "^0.1.18",
+    "@raychee/utils": "^0.1.19",
     "apollo-cache-inmemory": "^1.6.2",
     "apollo-client": "^2.6.3",
     "apollo-link": "^1.2.12",
@@ -29,12 +29,12 @@
     "cron": "^1.7.2",
     "debug": "^4.1.1",
     "deep-object-diff": "^1.1.0",
+    "fast-json-stable-stringify": "^2.1.0",
     "graphql": "^14.4.2",
     "graphql-augment": "^0.5.4",
     "graphql-tag": "latest",
     "graphql-tools": "latest",
     "graphql-type-json": "^0.3.0",
-    "json-stable-stringify": "^1.0.1",
     "koa": "^2.7.0",
     "koa-bodyparser": "^4.3.0",
     "lodash": "^4.17.15",
