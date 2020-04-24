@@ -251,7 +251,7 @@ describe('Operations', () => {
 
     describe('update a task with non-null values', () => {
         test('', async () => {
-            await operations.updateTasks({_id: taskBx._id}, {delay: 21, interval: 50});
+            await operations.updateTasks({_id: taskBx._id}, {delay: 21, mode: 'REPEATED', interval: 50});
             let task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c1, mtime: m1, _id: i1, nextTime: n1, ...t1} = task;
             const {ctime: c8, mtime: m8, _id: i8, nextTime: n8, ...t8} = taskBx;
@@ -605,9 +605,36 @@ describe('Operations', () => {
         await expect((async () => {
             await operations.insertTask({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
+                delay: 8, validBefore: new Date('2019-01-01'),
+            });
+        })()).rejects.toThrow('field "mode" must be provided for a task');
+        await expect((async () => {
+            await operations.insertTask({
+                domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
                 delay: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED'
             });
-        })()).rejects.toThrow('field "interval" should be an Int >= 0 when "mode" is "REPEATED"')
+        })()).rejects.toThrow('field "interval" should be an Int >= 0 when "mode" is "REPEATED"');
+        await expect((async () => {
+            await operations.insertTask({
+                domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
+                delay: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', schedule: ''
+            });
+        })()).rejects.toThrow('field "schedule" must be null when "mode" is "REPEATED"');
+        await expect((async () => {
+            await operations.insertTask({
+                domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
+                delay: 8, validBefore: new Date('2019-01-01'), mode: 'SCHEDULED', schedule: '* * * ? * *'
+            });
+        })()).rejects.toThrow('field "schedule" is not a valid cron expression: Error: Field (?) cannot be parsed');
+    });
+
+    test('update a task with invalid config', async () => {
+        await expect((async () => {
+            await operations.updateTasks({_id: taskBx._id}, {mode: 'REPEATED'});
+        })()).rejects.toThrow('field "interval" should be an Int >= 0 when "mode" is "REPEATED"');
+        await expect((async () => {
+            await operations.updateTasks({_id: taskBx._id}, {mode: 'SCHEDULED', schedule: '* * * ? * *'});
+        })()).rejects.toThrow('field "schedule" is not a valid cron expression: Error: Field (?) cannot be parsed');
     });
 
     test('insert duplicate jobs', async () => {
