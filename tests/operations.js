@@ -129,13 +129,13 @@ describe('Operations', () => {
             taskBx = await operations.insertTask({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
-                params: {p1: 123}
+                params: {p1: 123, testNullValue: null}
             });
             const {ctime: c1, mtime: m1, _id: i1, local: l1, ...t1} = taskBx;
             expect(t1).toStrictEqual({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
-                enabled: true, params: {p1: 123}, context: {},
+                enabled: true, params: {p1: 123, testNullValue: null}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
                 nextTime: new Date(0),
@@ -147,13 +147,13 @@ describe('Operations', () => {
             expect(t2).toStrictEqual({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
-                enabled: true, params: {p1: 123}, context: {},
+                enabled: true, params: {p1: 123, testNullValue: null}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
                 nextTime: new Date(0),
                 local: {
                     domain: 'B', type: 'x',
-                    enabled: true, params: {p1: 123}, context: {}, validBefore: new Date('2019-01-01'),
+                    enabled: true, params: {p1: 123, testNullValue: null}, context: {}, validBefore: new Date('2019-01-01'),
                     subTasks: [{domain: 'A', type: 'b', retry: 9}], mode: 'REPEATED', interval: 30, retry: 8,
                     nextTime: new Date(0),
                 }
@@ -167,7 +167,7 @@ describe('Operations', () => {
             let job = await operations.insertJob({task: taskBx._id});
             const {_id: i1, timeCreated: t1, local: l1, ...j1} = job;
             expect(j1).toStrictEqual({
-                domain: 'B', type: 'x', delay: 2, params: {p1: 123}, context: {}, trials: [], status: 'PENDING',
+                domain: 'B', type: 'x', delay: 2, params: {p1: 123, testNullValue: null}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 8, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupRecent: true,
             });
