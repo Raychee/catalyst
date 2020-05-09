@@ -198,7 +198,7 @@ describe('Scheduler', () => {
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
             validAfter: new Date(Date.now() + 10000), enabled: false
         });
-        const t7LastTime = new Date(Date.now() - 30 * 60 * 1000);
+        let t7LastTime = new Date(Date.now() - 30 * 60 * 1000);
         let t7 = await operations.insertTask({
             domain: 'domain', type: 'type', mode: 'SCHEDULED', schedule: '0 10 * * * *',
             lastTime: t7LastTime,
@@ -224,6 +224,9 @@ describe('Scheduler', () => {
         nextTime.setMinutes(10, 0, 0);
         if (minutes >= 10) {
             nextTime = new Date(nextTime.getTime() + 60 * 60 * 1000);
+        }
+        if (nextTime - 60 * 60 * 1000 > t7LastTime) {
+            t7LastTime = new Date(nextTime - 60 * 60 * 1000);
         }
 
         t1 = await operations.tasks.findOne({_id: t1._id});
