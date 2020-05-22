@@ -232,7 +232,7 @@ type Job {
     如果该实例是由任务直接创建，那么此字段就指向它；
     如果该实例是由别的任务实例创建，那么此字段指向的是实例创建链中最源头的实例所对应的任务。
     """
-    task: Task! @query
+    task: Task @query
     "如果该实例是由别的任务实例创建，此字段表明直接创建它的任务实例；其他情况下为空。"
     createdBy: Job @query
     """
@@ -240,6 +240,8 @@ type Job {
     如果该实例是由别的任务实例创建（createdBy不为空），则这里标记任务创建链中最源头的任务实例；其他情况下为空。
     """
     createdFrom: Job @query
+    "此实例被去重时，导致去重的源头的实例任务。"
+    duplicateOf: Job @query
 
     "任务状态"
     status: JobStatus @query @upsert

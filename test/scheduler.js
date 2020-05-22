@@ -51,18 +51,18 @@ describe('Scheduler', () => {
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
 
-        await scheduler._activate();
+        await scheduler.activate();
         for (let i = 0; i < 3; i++) {
             try {
                 await sleep(100);
-                await scheduler._heartbeat();
+                await scheduler.heartbeat();
             } catch (e) {
                 expect(e).toBeUndefined();
             }
         }
         await sleep(1100);
         try {
-            await scheduler._heartbeat();
+            await scheduler.heartbeat();
         } catch (e) {
             expect(e.name).toBe('HeartAttack');
         }
@@ -79,8 +79,8 @@ describe('Scheduler', () => {
         const scheduler2 = new Scheduler(
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
-        await scheduler1._activate();
-        await scheduler2._activate();
+        await scheduler1.activate();
+        await scheduler2.activate();
 
         const {insertedId: t1} = await operations.tasks.insertOne({lockedBy: s1});
         const {insertedId: t2} = await operations.tasks.insertOne({lockedBy: s1});
@@ -96,7 +96,7 @@ describe('Scheduler', () => {
         const {insertedId: j7} = await operations.jobs.insertOne({status: 'DELAYED'});
 
         for (const scheduler of [scheduler1, scheduler2]) {
-            await scheduler._clearDeadSchedulers();
+            await scheduler.clearDeadSchedulers();
             expect(await operations.tasks.findOne({_id: t1})).toStrictEqual({_id: t1, lockedBy: null});
             expect(await operations.tasks.findOne({_id: t2})).toStrictEqual({_id: t2, lockedBy: null});
             expect(await operations.tasks.findOne({_id: t3})).toStrictEqual({_id: t3, lockedBy: null});
@@ -111,7 +111,7 @@ describe('Scheduler', () => {
             expect(await operations.jobs.findOne({_id: j7})).toStrictEqual({_id: j7, status: 'DELAYED'});
         }
 
-        await scheduler1._stop();
+        await scheduler1.deactivate();
 
         expect(await operations.tasks.findOne({_id: t1})).toStrictEqual({_id: t1, lockedBy: null});
         expect(await operations.tasks.findOne({_id: t2})).toStrictEqual({_id: t2, lockedBy: null});
@@ -147,7 +147,7 @@ describe('Scheduler', () => {
         const scheduler2 = new Scheduler(
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
-        await scheduler1._activate();
+        await scheduler1.activate();
 
         const {insertedId: j1} = await operations.jobs.insertOne({status: 'RUNNING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: 0, lockedBy: scheduler1.id});
         const {insertedId: j2} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: -1});
@@ -158,7 +158,7 @@ describe('Scheduler', () => {
         const {insertedId: j7} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency100', type: 'typeCurrency2', priority: 2});
         const {insertedId: j8} = await operations.jobs.insertOne({status: 'PENDING', domain: 'domainCurrency100', type: 'typeCurrency2', priority: 1});
 
-        const ret = await Promise.all([scheduler1._dispatchJobs(), scheduler2._dispatchJobs()]);
+        const ret = await Promise.all([scheduler1.dispatchJobs(), scheduler2.dispatchJobs()]);
 
         expect(ret.filter(r => r)).toHaveLength(1);
 
@@ -215,8 +215,8 @@ describe('Scheduler', () => {
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
 
-        await scheduler._activate();
-        await scheduler._scheduleTasks();
+        await scheduler.activate();
+        await scheduler.scheduleTasks();
 
         const now = new Date();
         const minutes = now.getMinutes();
@@ -279,7 +279,7 @@ describe('Scheduler', () => {
         const scheduler = new Scheduler(
             new Logger('Scheduler'), operations, taskLoader, {heartbeat: 0.1, heartAttack: 1}
         );
-        await scheduler._activate();
+        await scheduler.activate();
         scheduler.running = Promise.resolve();
 
         let t1 = await operations.insertTask({domain: 'domain', type: 'type', mode: 'ONCE'});
