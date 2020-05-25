@@ -29,7 +29,7 @@ type Mutation {
     UpdateDomain: Domain
     UpdateType: Type
     UpdateTask: Task
-    UpdateJob: Job
+    UpdateJob(waitForStop: Boolean = false): Job
 
 }
 
