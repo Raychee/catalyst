@@ -29,7 +29,7 @@ type Mutation {
     UpdateDomain: Domain
     UpdateType: Type
     UpdateTask: Task
-    UpdateJob(waitForStop: Boolean = false): Job
+    UpdateJob(wait: JobWaitConfig): Job
 
 }
 
@@ -321,4 +321,16 @@ type TaskSchedulingConfig {
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
     """
     dedupRecent: Boolean @query @upsert
+}
+
+"用于等待任务完成时的配置项"
+input JobWaitConfig {
+    "期望等待的任务目标状态，默认为停止态"
+    until: [JobStatus!] = [SUCCESS, FAILED, CANCELED]
+    "最大等待时长，单位秒，必须>0，且最大为3600（一小时）。如果到达最大等待时长但是依然没有得到期望的结果，就把当前任务状态返回。"
+    timeout: Int = 60
+    "如果任务被去重，是否返回真正执行的那个任务。"
+    followDuplicate: Boolean = false
+    "如果任务监听是通过轮询机制，设置轮询的频率，单位秒，必须>0，且最大不能超过设定的最大等待时长。"
+    pollInterval: Int = 1
 }
