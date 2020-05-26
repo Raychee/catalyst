@@ -197,13 +197,13 @@ type Job {
     "任务实例全局唯一id"
     id: ID! @query @upsert
     "任务业务域"
-    domain: String! @query
+    domain: String! @query @upsert
     "任务类型，决定了任务的执行逻辑"
-    type: String! @query
+    type: String! @query @upsert
     "任务参数，具体有哪些参数跟任务类型有关"
-    params: JSONObject @query
+    params: JSONObject @query @upsert
     "任务上下文"
-    context: JSONObject @query
+    context: JSONObject @query @upsert
     "任务实例的优先级"
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
