@@ -20,7 +20,7 @@ type Query {
     Domain: [Domain!]! @result @batch @sort @page
     Type: [Type!]! @result @batch @sort @page
     Task: [Task!]! @result @batch @sort @page
-    Job: [Job!]! @result @batch @sort @page
+    Job(wait: JobWaitConfig): [Job!]! @result @batch @sort @page
 
 }
 
