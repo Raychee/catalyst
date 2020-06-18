@@ -3,8 +3,8 @@ scalar JSONObject
 scalar DateTime
 directive @sort on FIELD_DEFINITION
 directive @page on FIELD_DEFINITION
-directive @query on FIELD_DEFINITION
-directive @upsert on FIELD_DEFINITION
+directive @query(type: String) on FIELD_DEFINITION
+directive @upsert(type: String) on FIELD_DEFINITION
 directive @result on FIELD_DEFINITION
 directive @batch on FIELD_DEFINITION
 directive @jwt(secret: String!, algorithm: String, expiresIn: Int, notBefore: Int) on SCHEMA
@@ -17,19 +17,19 @@ schema @jwt(secret: "${secret}", expiresIn: 1800) {
 
 type Query {
 
-    Domain: [Domain!]! @result @batch @sort @page
-    Type: [Type!]! @result @batch @sort @page
-    Task: [Task!]! @result @batch @sort @page
-    Job(wait: JobWaitConfig): [Job!]! @result @batch @sort @page
+    Domain: [Domain!]! @query(type: "Domain") @result @batch @sort @page
+    Type: [Type!]! @query(type: "Type") @result @batch @sort @page
+    Task: [Task!]! @query(type: "Task") @result @batch @sort @page
+    Job(wait: JobWaitConfig): [Job!]! @query(type: "Job") @result @batch @sort @page
 
 }
 
 type Mutation {
 
-    UpdateDomain: Domain
-    UpdateType: Type
-    UpdateTask: Task
-    UpdateJob(wait: JobWaitConfig): Job
+    UpdateDomain: Domain @upsert(type: "Domain")
+    UpdateType: Type @upsert(type: "Type")
+    UpdateTask: Task @upsert(type: "Task")
+    UpdateJob(wait: JobWaitConfig): Job @upsert(type: "Job")
 
 }
 
