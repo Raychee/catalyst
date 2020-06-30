@@ -4,13 +4,14 @@ const {sleep} = require('@raychee/utils');
 const {Logger} = require('../lib/logger');
 const Operations = require('../lib/operations');
 const {TaskDomain, TaskType, Job} = require('../lib/task');
+const {JobWatcher} = require('../lib/watcher');
 
 
 describe('Job', () => {
 
     let connection, db;
     /** @type Operations */
-    let operations;
+    let operations, jobWatcher;
 
     beforeAll(async () => {
         connection = await MongoClient.connect(process.env.MONGO_URL, {
@@ -26,9 +27,15 @@ describe('Job', () => {
                 };
             }
         });
+        jobWatcher = new JobWatcher(operations.jobs, {
+            targetStatus: ['SUCCESS', 'FAILED', 'CANCELED'],
+            pollInterval: 1,
+        });
     });
 
     afterAll(async () => {
+        jobWatcher.close();
+        jobWatcher.abortAll(new Error('test is finished'));
         await connection.close();
         await db.close();
     });
@@ -63,7 +70,7 @@ describe('Job', () => {
 
         expect(jobConfig.retry).toBe(2);
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
         let timeStarted = undefined, timeStopped = undefined;
         for (let trial = 0; trial <= job.config.retry; trial++) {
             job._timeout = false;
@@ -142,7 +149,7 @@ describe('Job', () => {
 
         expect(jobConfig.retry).toBe(3);
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         for (let trial = 0; trial <= 2; trial++) {
             job._timeout = false;
@@ -200,7 +207,7 @@ describe('Job', () => {
         const taskConfig = await operations.insertTask({domain: 'domain3', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         const execute = job._execute();
         const cancelJob = (async () => {
@@ -235,7 +242,7 @@ describe('Job', () => {
         const taskConfig = await operations.insertTask({domain: 'domain4', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         const execute = job._execute();
         const interruptJob = (async () => {
@@ -267,7 +274,7 @@ describe('Job', () => {
         const taskConfig = await operations.insertTask({domain: 'domain5', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         const execute = job._execute();
         const changeDelay = (async () => {
@@ -298,7 +305,7 @@ describe('Job', () => {
         const taskConfig = await operations.insertTask({domain: 'domain6', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         await job._execute();
         expect(job.config.status).toBe('SUCCESS');
@@ -330,7 +337,7 @@ describe('Job', () => {
         const taskConfig = await operations.insertTask({domain: 'domain7', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         const running = job._execute();
         await sleep(1500);
@@ -365,7 +372,7 @@ describe('Job', () => {
         const taskConfig = await operations.insertTask({domain: 'domain8', type: 'type1', mode: 'ONCE'});
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        const job = new Job(jobConfig, taskType, undefined, operations);
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
 
         const running = job._execute();
         await sleep(1500);
