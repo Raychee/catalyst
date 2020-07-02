@@ -4,7 +4,7 @@ const {sleep} = require('@raychee/utils');
 const {Logger} = require('../lib/logger');
 const Operations = require('../lib/operations');
 const {TaskDomain, TaskType, Job} = require('../lib/task');
-const {JobWatcher} = require('../lib/watcher');
+const {JobWatcherManager} = require('../lib/watcher');
 
 
 describe('Job', () => {
@@ -27,10 +27,7 @@ describe('Job', () => {
                 };
             }
         });
-        jobWatcher = new JobWatcher(operations.jobs, {
-            targetStatus: ['SUCCESS', 'FAILED', 'CANCELED'],
-            pollInterval: 1,
-        });
+        jobWatcher = new JobWatcherManager(operations.jobs).getWatcher(['SUCCESS', 'FAILED', 'CANCELED']);
     });
 
     afterAll(async () => {

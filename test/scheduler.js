@@ -51,6 +51,7 @@ describe('Scheduler', () => {
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
 
+        scheduler.isRunning = true;
         await scheduler.activate();
         for (let i = 0; i < 3; i++) {
             try {
@@ -79,7 +80,9 @@ describe('Scheduler', () => {
         const scheduler2 = new Scheduler(
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
+        scheduler1.isRunning = true;
         await scheduler1.activate();
+        scheduler2.isRunning = true;
         await scheduler2.activate();
 
         const {insertedId: t1} = await operations.tasks.insertOne({lockedBy: s1});
@@ -147,6 +150,7 @@ describe('Scheduler', () => {
         const scheduler2 = new Scheduler(
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
+        scheduler1.isRunning = true;
         await scheduler1.activate();
 
         const {insertedId: j1} = await operations.jobs.insertOne({status: 'RUNNING', domain: 'domainCurrency3', type: 'typeCurrency4', priority: 0, lockedBy: scheduler1.id});
@@ -215,6 +219,7 @@ describe('Scheduler', () => {
             new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
         );
 
+        scheduler.isRunning = true;
         await scheduler.activate();
         await scheduler.scheduleTasks();
 
@@ -279,6 +284,7 @@ describe('Scheduler', () => {
         const scheduler = new Scheduler(
             new Logger('Scheduler'), operations, taskLoader, {heartbeat: 0.1, heartAttack: 1}
         );
+        scheduler.isRunning = true;
         await scheduler.activate();
         scheduler.running = Promise.resolve();
 
