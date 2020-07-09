@@ -385,4 +385,35 @@ describe('Job', () => {
         expect(scheduled2).toHaveLength(0);
     });
 
+    test('run a job that checks for history', async () => {
+        const taskDomain = new TaskDomain('domain9');
+        const taskType = new TaskType(taskDomain, 'type1');
+        await taskType.load({
+            async run({}, ctx) {
+                const jobs = await this.history({
+                    type: 'type1', timeStarted_gt: new Date('2020-01-01T00:00:00Z'),
+                    status_in: ['SUCCESS', 'PENDING'],
+                });
+                ctx.jobs = jobs;
+            }
+        });
+
+        await operations.ensureDomain('domain9');
+        await operations.ensureType('domain9', 'type1');
+        await operations.ensureType('domain9', 'type2');
+        const taskConfig = await operations.insertTask({domain: 'domain9', type: 'type1', mode: 'ONCE'});
+        const jobConfig = await operations.insertJob({task: taskConfig._id});
+        await operations.insertJob({task: taskConfig._id, type: 'type2'});
+        await operations.insertJob({task: taskConfig._id, timeStarted: new Date('2019-01-01T00:00:00Z')});
+        const j = await operations.insertJob({task: taskConfig._id, timeStarted: new Date('2020-01-02T00:00:00Z'), status: 'SUCCESS'});
+        await operations.insertJob({task: taskConfig._id, timeStarted: new Date('2020-01-03T00:00:00Z'), status: 'FAILED'});
+
+        const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
+
+        await job._execute();
+        expect(job.config.status).toBe('SUCCESS');
+        expect(job.config.context.jobs).toHaveLength(1);
+        expect(job.config.context.jobs[0]).toStrictEqual(j);
+    });
+
 });
