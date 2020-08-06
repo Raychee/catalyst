@@ -58,6 +58,8 @@ type Domain {
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    "对任务实例去重的目标个数，即去重后保留的真正执行的任务数，一般情况下为1。该参数仅在dedupWithin >= 0时有效。"
+    dedupLimit: Int @query @upsert
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
@@ -92,6 +94,8 @@ type Type {
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    "对任务实例去重的目标个数，即去重后保留的真正执行的任务数，一般情况下为1。该参数仅在dedupWithin >= 0时有效。"
+    dedupLimit: Int @query @upsert
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
@@ -132,6 +136,8 @@ type Task {
     validAfter: DateTime @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    "对任务实例去重的目标个数，即去重后保留的真正执行的任务数，一般情况下为1。该参数仅在dedupWithin >= 0时有效。"
+    dedupLimit: Int @query @upsert
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
@@ -208,6 +214,8 @@ type Job {
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    "对任务实例去重的目标个数，即去重后保留的真正执行的任务数，一般情况下为1。该参数仅在dedupWithin >= 0时有效。"
+    dedupLimit: Int @query @upsert
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
@@ -316,6 +324,8 @@ type TaskSchedulingConfig {
     retryDelayFactor: Float @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
     dedupWithin: Int @query @upsert
+    "对任务实例去重的目标个数，即去重后保留的真正执行的任务数，一般情况下为1。该参数仅在dedupWithin >= 0时有效。"
+    dedupLimit: Int @query @upsert
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。

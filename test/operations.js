@@ -1,3 +1,5 @@
+const {describe, beforeAll, afterAll, test, expect} = require('@jest/globals');
+
 const {MongoClient} = require('mongodb');
 
 const {Logger} = require('../lib/logger');
@@ -40,7 +42,8 @@ describe('Operations', () => {
         test('', async () => {
             const config = {
                 concurrency: 1, timeout: -1, delay: 0, delayRandomize: 0,
-                retry: 0, retryDelayFactor: 1, priority: 0, dedupWithin: -1, dedupRecent: true,
+                retry: 0, retryDelayFactor: 1, priority: 0, 
+                dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
             };
 
             for (const [domainName, typeName] of [
@@ -137,7 +140,7 @@ describe('Operations', () => {
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 enabled: true, params: {p1: 123, testNullValue: null}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: -1, dedupRecent: true,
+                priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
                 nextTime: new Date(0),
             });
             expect(i1).toBeTruthy();
@@ -149,7 +152,7 @@ describe('Operations', () => {
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 enabled: true, params: {p1: 123, testNullValue: null}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: -1, dedupRecent: true,
+                priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
                 nextTime: new Date(0),
                 local: {
                     domain: 'B', type: 'x',
@@ -169,7 +172,7 @@ describe('Operations', () => {
             expect(j1).toStrictEqual({
                 domain: 'B', type: 'x', delay: 2, params: {p1: 123, testNullValue: null}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 8, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: -1, dedupRecent: true,
+                priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
             });
             expect(i1).toBeTruthy();
             expect(t1.getTime()).toBeGreaterThanOrEqual(now.getTime());
@@ -190,7 +193,7 @@ describe('Operations', () => {
             expect(j3).toStrictEqual({
                 domain: 'A', type: 'a', delay: 0, params: {}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 0, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: -1, dedupRecent: true,
+                priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
             });
             expect(i3).toBeTruthy();
             expect(t3.getTime()).toBeGreaterThanOrEqual(now.getTime());
@@ -217,7 +220,7 @@ describe('Operations', () => {
             expect(j1).toStrictEqual({
                 domain: 'A', type :'b', delay: 30, params: {}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 9, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
-                priority: 0, dedupWithin: -1, dedupRecent: true,
+                priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
             });
             expect(i1).toBeTruthy();
             expect(t1.getTime()).toBeGreaterThanOrEqual(now.getTime());
@@ -638,11 +641,13 @@ describe('Operations', () => {
     });
 
     test('insert duplicate jobs', async () => {
+        let t1, j1, j2, j3;
+        
         await operations.ensureDomain('dedup0');
         await operations.ensureType('dedup0', 't1');
-        let t1 = await operations.insertTask({domain: 'dedup0', type: 't1', mode: 'ONCE', dedupWithin: 0});
-        let j1 = await operations.insertJob({task: t1._id, status: 'RUNNING'});
-        let j2 = await operations.insertJob({task: t1._id});
+        t1 = await operations.insertTask({domain: 'dedup0', type: 't1', mode: 'ONCE', dedupWithin: 0});
+        j1 = await operations.insertJob({task: t1._id, status: 'RUNNING'});
+        j2 = await operations.insertJob({task: t1._id});
         expect(j2).toMatchObject({status: 'CANCELED', duplicateOf: j1._id});
         const now = new Date();
         await operations.updateJobs({_id: j1._id}, {status: 'SUCCESS', timeStopped: now});
@@ -664,6 +669,18 @@ describe('Operations', () => {
         j2 = await operations.insertJob({task: t1._id, timeCreated: new Date(now.getTime() + 1001)});
         expect(j2.status).toBe('PENDING');
         expect(j2.duplicateOf).toBeUndefined();
+
+        await operations.ensureDomain('dedupLimit2');
+        await operations.ensureType('dedupLimit2', 't1');
+        t1 = await operations.insertTask({domain: 'dedupLimit2', type: 't1', mode: 'ONCE', dedupWithin: 1, dedupLimit: 2});
+        j1 = await operations.insertJob({task: t1._id, status: 'RUNNING'});
+        j2 = await operations.insertJob({task: t1._id});
+        expect(j2).toMatchObject({status: 'PENDING'});
+        j3 = await operations.insertJob({task: t1._id});
+        expect(j3).toMatchObject({status: 'CANCELED', duplicateOf: j2._id});
+        await operations.updateJobs({_id: j2._id}, {status: 'SUCCESS', timeStopped: now});
+        j3 = await operations.insertJob({task: t1._id});
+        expect(j3).toMatchObject({status: 'CANCELED', duplicateOf: j1._id});
 
         await operations.ensureDomain('dedupOld0');
         await operations.ensureType('dedupOld0', 't1');
