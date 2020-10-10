@@ -49,6 +49,7 @@ describe('Operations', () => {
             for (const [domainName, typeName] of [
                 ['A', 'a'],
                 ['A', 'b'],
+                ['A', 'c'],
                 ['B', 'x'],
             ]) {
                 const {ctime: c1, mtime: m1, ...domain} = await operations.ensureDomain(domainName);
@@ -86,14 +87,15 @@ describe('Operations', () => {
     describe('update task domains and types', () => {
         test('', async () => {
             await operations.updateTypes(
-                {domain: 'B', type: 'x'}, {subTasks: [{domain: 'A', type: 'b', delay: 30}]}
+                {domain: 'B', type: 'x'}, 
+                {subTasks: [{domain: 'A', type: 'b', delay: 30}, {domain: '*', type: 'c', delay: 40}]}
             );
             let taskType = await operations.types.findOne({domain: 'B', type: 'x'});
             const {_id: i, ctime: c, mtime: m, local: l, ...t} = taskType;
             const {_id: i1, ctime: c1, mtime: m1, local: l1, ...t1} = taskTypeBx;
-            expect(t).toStrictEqual({...t1, subTasks: [{domain: 'A', type: 'b', delay: 30}]});
+            expect(t).toStrictEqual({...t1, subTasks: [{domain: 'A', type: 'b', delay: 30}, {domain: '*', type: 'c', delay: 40}]});
             expect(l1).toBeUndefined();
-            expect(l).toStrictEqual({subTasks: [{domain: 'A', type: 'b', delay: 30}]});
+            expect(l).toStrictEqual({subTasks: [{domain: 'A', type: 'b', delay: 30}, {domain: '*', type: 'c', delay: 40}]});
             taskTypeBx = taskType;
 
             await operations.updateTypes(
@@ -136,7 +138,8 @@ describe('Operations', () => {
             });
             const {ctime: c1, mtime: m1, _id: i1, local: l1, ...t1} = taskBx;
             expect(t1).toStrictEqual({
-                domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
+                domain: 'B', type: 'x', 
+                subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}, {domain: '*', type: 'c', delay: 40}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 enabled: true, params: {p1: 123, testNullValue: null}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
@@ -148,7 +151,8 @@ describe('Operations', () => {
             taskBx = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c2, mtime: m2, _id: i2, ...t2} = taskBx;
             expect(t2).toStrictEqual({
-                domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}],
+                domain: 'B', type: 'x', 
+                subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}, {domain: '*', type: 'c', delay: 40}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
                 enabled: true, params: {p1: 123, testNullValue: null}, context: {},
                 timeout: -1, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
@@ -157,8 +161,8 @@ describe('Operations', () => {
                 local: {
                     domain: 'B', type: 'x',
                     enabled: true, params: {p1: 123, testNullValue: null}, context: {}, validBefore: new Date('2019-01-01'),
-                    subTasks: [{domain: 'A', type: 'b', retry: 9}], mode: 'REPEATED', interval: 30, retry: 8,
-                    nextTime: new Date(0),
+                    subTasks: [{domain: 'A', type: 'b', retry: 9}], 
+                    mode: 'REPEATED', interval: 30, retry: 8, nextTime: new Date(0),
                 }
             });
         });
@@ -235,6 +239,14 @@ describe('Operations', () => {
             expect(i2).toEqual(i1);
             expect(t2.getTime()).toBe(t1.getTime());
             expect(t3.getTime()).toBe(t1.getTime());
+
+            const jobAc = await operations.insertJob({task: taskBx._id, domain: 'A', type :'c', params: {}});
+            const {_id: i3, timeCreated: t4, local: l3, ...j3} = jobAc;
+            expect(j3).toStrictEqual({
+                domain: 'A', type :'c', delay: 40, params: {}, context: {}, trials: [], status: 'PENDING',
+                task: taskBx._id, retry: 0, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
+                priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
+            });
         });
     });
 
@@ -273,9 +285,11 @@ describe('Operations', () => {
             const {ctime: c6, mtime: m6, _id: i6, nextTime: n6, ...t6} = task;
             const {ctime: c7, mtime: m7, _id: i7, nextTime: n7, ...t7} = taskBx;
             expect(t6).toStrictEqual({
-                ...t7, delay: 15, subTasks: [{domain: 'A', type: 'b', delay: 30, timeout: 600}],
+                ...t7, delay: 15, 
+                subTasks: [{domain: 'A', type: 'b', delay: 30, timeout: 600}, {domain: '*', type: 'c', delay: 40}],
                 local: {
-                    ...t7.local, delay: 15, subTasks: [{domain: 'A', type: 'b', timeout: 600}],
+                    ...t7.local, delay: 15, 
+                    subTasks: [{domain: 'A', type: 'b', timeout: 600}],
                 }
             });
             expect(m6.getTime()).toBeGreaterThanOrEqual(m7.getTime());
@@ -310,7 +324,7 @@ describe('Operations', () => {
             const task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c, mtime: m, _id: i, local: l, nextTime: n, ...t} = task;
             const {ctime: c1, mtime: m1, _id: i1, local: l1, nextTime: n1, ...t1} = taskBx;
-            expect(t).toStrictEqual({...t1, delay: 2, subTasks: [{domain: 'A', type: 'b', delay: 30}]});
+            expect(t).toStrictEqual({...t1, delay: 2, subTasks: [{domain: 'A', type: 'b', delay: 30}, {domain: '*', type: 'c', delay: 40}]});
             expect(l).toStrictEqual({...l1, delay: null, subTasks: null});
             expect(m.getTime()).toBeGreaterThanOrEqual(m1.getTime());
             expect(c.getTime()).toBe(c1.getTime());
