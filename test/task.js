@@ -63,10 +63,14 @@ describe('Job', () => {
         await operations.ensureType('domain1', 'type3');
         await operations.updateDomains({domain: 'domain1'}, {retry: 2});
         const taskConfig = await operations.insertTask({
-            domain: 'domain1', type: 'type1', params: {v: 1}, mode: 'ONCE'
+            domain: 'domain1', type: 'type1', 
+            params: {v: 1, schedule: {time: '${timeScheduled}', taskId: '${task.id}'}}, 
+            mode: 'ONCE'
         });
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
+        expect(jobConfig.params.schedule.time).toBe(jobConfig.timeCreated.toISOString());
+        expect(jobConfig.params.schedule.taskId).toBe(taskConfig._id.toString());
         expect(jobConfig.retry).toBe(2);
 
         const job = new Job(jobConfig, taskType, jobWatcher, undefined, operations);
@@ -114,7 +118,7 @@ describe('Job', () => {
             }
         }
 
-    });
+    }, 10000000);
 
     test('run a catchable job that finally crashes', async () => {
 

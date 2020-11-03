@@ -172,7 +172,7 @@ describe('Operations', () => {
         test('', async () => {
             const now = new Date();
             let job = await operations.insertJob({task: taskBx._id});
-            const {_id: i1, timeCreated: t1, local: l1, ...j1} = job;
+            const {_id: i1, timeCreated: t1, timeScheduled: ts1, local: l1, ...j1} = job;
             expect(j1).toStrictEqual({
                 domain: 'B', type: 'x', delay: 2, params: {p1: 123, testNullValue: null}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 8, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
@@ -180,20 +180,23 @@ describe('Operations', () => {
             });
             expect(i1).toBeTruthy();
             expect(t1.getTime()).toBeGreaterThanOrEqual(now.getTime());
+            expect(t1.getTime()).toBe(ts1.getTime());
             expect(l1).toBeUndefined();
 
             jobBx = await operations.jobs.findOne({_id: i1});
-            const {_id: i2, timeCreated: t21, local: {timeCreated: t22, ...l2}, ...j2} = jobBx;
+            const {_id: i2, timeCreated: t21, timeScheduled: ts21, local: {timeCreated: t22, timeScheduled: ts22, ...l2}, ...j2} = jobBx;
             expect(j2).toStrictEqual(j1);
             expect(l2).toStrictEqual({
                 domain: 'B', type: 'x', context: {}, task: taskBx._id, status: 'PENDING', trials: []
             });
             expect(i2).toEqual(i1);
             expect(t21.getTime()).toBe(t1.getTime());
+            expect(t21.getTime()).toBe(ts21.getTime());
             expect(t22.getTime()).toBe(t1.getTime());
+            expect(t22.getTime()).toBe(ts22.getTime());
 
             job = await operations.insertJob({task: taskBx._id, domain: 'A', type: 'a', params: {}});
-            const {_id: i3, timeCreated: t3, local: l3, ...j3} = job;
+            const {_id: i3, timeCreated: t3, timeScheduled: ts3, local: l3, ...j3} = job;
             expect(j3).toStrictEqual({
                 domain: 'A', type: 'a', delay: 0, params: {}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 0, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
@@ -201,17 +204,20 @@ describe('Operations', () => {
             });
             expect(i3).toBeTruthy();
             expect(t3.getTime()).toBeGreaterThanOrEqual(now.getTime());
+            expect(t3.getTime()).toBe(ts3.getTime());
             expect(l3).toBeUndefined();
 
             jobAa = await operations.jobs.findOne({_id: i3});
-            const {_id: i4, timeCreated: t41, local: {timeCreated: t42, ...l4}, ...j4} = jobAa;
+            const {_id: i4, timeCreated: t41, timeScheduled: ts41, local: {timeCreated: t42, timeScheduled: ts42, ...l4}, ...j4} = jobAa;
             expect(j4).toStrictEqual(j3);
             expect(l4).toStrictEqual({
                 domain: 'A', type: 'a', params: {}, context: {}, task: taskBx._id, status: 'PENDING', trials: []
             });
             expect(i4).toEqual(i3);
             expect(t41.getTime()).toBe(t3.getTime());
+            expect(t41.getTime()).toBe(ts41.getTime());
             expect(t42.getTime()).toBe(t3.getTime());
+            expect(t42.getTime()).toBe(ts42.getTime());
         });
     });
 
@@ -220,7 +226,7 @@ describe('Operations', () => {
             const now = new Date();
 
             const job = await operations.insertJob({task: taskBx._id, domain: 'A', type :'b', params: {}});
-            const {_id: i1, timeCreated: t1, local: l1, ...j1} = job;
+            const {_id: i1, timeCreated: t1, timeScheduled: ts1, local: l1, ...j1} = job;
             expect(j1).toStrictEqual({
                 domain: 'A', type :'b', delay: 30, params: {}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 9, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
@@ -228,20 +234,23 @@ describe('Operations', () => {
             });
             expect(i1).toBeTruthy();
             expect(t1.getTime()).toBeGreaterThanOrEqual(now.getTime());
+            expect(t1.getTime()).toBe(ts1.getTime());
             expect(l1).toBeUndefined();
 
             jobAb = await operations.jobs.findOne({_id: i1});
-            const {_id: i2, timeCreated: t2, local: {timeCreated: t3, ...l2}, ...j2} = jobAb;
+            const {_id: i2, timeCreated: t2, timeScheduled: ts2, local: {timeCreated: t3, timeScheduled: ts3, ...l2}, ...j2} = jobAb;
             expect(j2).toStrictEqual(j1);
             expect(l2).toStrictEqual({
                 domain: 'A', type :'b', params: {}, context: {}, task: taskBx._id, status: 'PENDING', trials: []
             });
             expect(i2).toEqual(i1);
             expect(t2.getTime()).toBe(t1.getTime());
+            expect(t2.getTime()).toBe(ts2.getTime());
             expect(t3.getTime()).toBe(t1.getTime());
+            expect(t3.getTime()).toBe(ts3.getTime());
 
             const jobAc = await operations.insertJob({task: taskBx._id, domain: 'A', type :'c', params: {}});
-            const {_id: i3, timeCreated: t4, local: l3, ...j3} = jobAc;
+            const {_id: i3, timeCreated: t4, timeScheduled: ts4, local: l3, ...j3} = jobAc;
             expect(j3).toStrictEqual({
                 domain: 'A', type :'c', delay: 40, params: {}, context: {}, trials: [], status: 'PENDING',
                 task: taskBx._id, retry: 0, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
@@ -255,8 +264,8 @@ describe('Operations', () => {
             await operations.updateJobs({_id: jobBx._id}, {status: 'RUNNING', delay: 100});
 
             const job = await operations.jobs.findOne({_id: jobBx._id});
-            const {_id: i, timeCreated: t1, local: {timeCreated: t2, ...l}, ...j} = job;
-            const {_id: i1, timeCreated: t11, local: {timeCreated: t12, ...l1}, ...j1} = jobBx;
+            const {_id: i, timeCreated: t1, timeScheduled: ts1, local: {timeCreated: t2, timeScheduled: ts2, ...l}, ...j} = job;
+            const {_id: i1, timeCreated: t11, timeScheduled: ts11, local: {timeCreated: t12, timeScheduled: ts12, ...l1}, ...j1} = jobBx;
             expect(j).toStrictEqual({...j1, delay: 100, status: 'RUNNING'});
             expect(l).toStrictEqual({...l1, delay: 100, status: 'RUNNING'});
 
