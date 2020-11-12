@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.4.108",
+  "version": "0.4.109",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -16,7 +16,7 @@
   "homepage": "https://github.com/Raychee/catalyst#readme",
   "dependencies": {
     "@koa/cors": "^3.0.0",
-    "@raychee/utils": "^0.2.22",
+    "@raychee/utils": "^0.2.23",
     "apollo-server-koa": "^2.7.0",
     "cron": "^1.7.2",
     "debug": "^4.1.1",
@@ -33,8 +33,8 @@
   },
   "devDependencies": {
     "@jest/globals": "^26.2.0",
-    "@shelf/jest-mongodb": "^1.1.5",
-    "jest": "^26.2.2"
+    "jest": "^26.2.2",
+    "mongodb-memory-server-global-4.2": "^6.9.2"
   },
   "scripts": {
     "test": "jest"

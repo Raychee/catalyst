@@ -52,10 +52,10 @@ module.exports = {
   // forceCoverageMatch: [],
 
   // A path to a module which exports an async function that is triggered once before all test suites
-  // globalSetup: null,
+  globalSetup: './jest.setup',
 
   // A path to a module which exports an async function that is triggered once after all test suites
-  // globalTeardown: null,
+  globalTeardown: './jest.teardown',
 
   // A set of global variables that need to be available in all test environments
   // globals: {},
@@ -91,7 +91,7 @@ module.exports = {
   // notifyMode: "failure-change",
 
   // A preset that is used as a base for Jest's configuration
-  preset: "@shelf/jest-mongodb",
+  // preset: "@shelf/jest-mongodb",
 
   // Run tests from one or more projects
   // projects: null,
@@ -143,8 +143,8 @@ module.exports = {
   // The glob patterns Jest uses to detect test files
   testMatch: [
     "**/test/**/*.[jt]s?(x)",
-  //   "**/__tests__/**/*.[jt]s?(x)",
-  //   "**/?(*.)+(spec|test).[tj]s?(x)"
+    //   "**/__tests__/**/*.[jt]s?(x)",
+    //   "**/?(*.)+(spec|test).[tj]s?(x)"
   ],
 
   // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
@@ -160,6 +160,9 @@ module.exports = {
 
   // This option allows use of a custom test runner
   // testRunner: "jasmine2",
+
+  // Default timeout of a test in milliseconds
+  testTimeout: 10000,
 
   // This option sets the URL for the jsdom environment. It is reflected in properties such as location.href
   // testURL: "http://localhost",
