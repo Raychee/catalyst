@@ -53,6 +53,8 @@ type Domain {
     concurrency: Int @query @upsert
     "该业务域下单个任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。为0则表示不限制超时。"
     timeout: Int @query @upsert
+    "该业务域下任务启动前的默认等待的时间，单位秒"
+    suspend: Float @query @upsert
     "该业务域下任务启动时的默认延迟执行的时间，单位秒"
     delay: Float @query @upsert
     """
@@ -89,6 +91,8 @@ type Type {
     concurrency: Int @query @upsert
     "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
     timeout: Int @query @upsert
+    "该业务域下任务启动前的默认等待的时间，单位秒"
+    suspend: Float @query @upsert
     "该类型任务启动时，默认延迟执行的时间，单位秒"
     delay: Float @query @upsert
     """
@@ -155,7 +159,9 @@ type Task {
     dedupRecent: Boolean @query @upsert
     "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
     timeout: Int @query @upsert
-    "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
+    "任务启动前，等待的时间，单位秒。如果没有设定该值，默认会参照Type.suspend。"
+    suspend: Float @query @upsert
+    "任务启动后，延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照Type.delay。"
     delay: Float @query @upsert
     """
     任务启动时，默认延迟执行的时间的随机抖动系数。
@@ -233,7 +239,9 @@ type Job {
     dedupRecent: Boolean @query @upsert
     "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
     timeout: Int @query @upsert
-    "延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照TaskTypeConfig.delay。"
+    "任务启动前，等待的时间，单位秒。如果没有设定该值，默认会参照Type.suspend。"
+    suspend: Float @query @upsert
+    "任务启动后，延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照Type.delay。"
     delay: Float @query @upsert
     """
     任务启动时，默认延迟执行的时间的随机抖动系数。
@@ -269,6 +277,8 @@ type Job {
     timeScheduled: DateTime @query
     "任务创建时间"
     timeCreated: DateTime @query
+    "任务开始等待执行的时间（在suspend <= 0时等于timeCreated）"
+    timePending: DateTime
     "任务真正开始执行的时间（如果任务配置有delay，则delay不计在内）"
     timeStarted: DateTime @query
     "任务结束的时间。结束包括失败成功"
@@ -279,6 +289,8 @@ type Job {
 }
 
 enum JobStatus {
+    "悬停状态"
+    SUSPENDED
     "等待调度状态，通常是任务分发子任务时，系统还未来得及调度时任务的状态"
     PENDING
     "延迟执行状态，对于任务delay>0的实例，系统会调度它但是先让它先sleep以满足delay，sleep期间任务状态为DELAYED"
@@ -323,7 +335,9 @@ type TaskSchedulingConfig {
     timeout: Int @query @upsert
     "任务优先级，一般为0，数字越大优先级越高"
     priority: Int @query @upsert
-    "延迟执行的时间间隔，单位秒，如果没有设定该值，默认会参照TaskTypeConfig.delay"
+    "任务启动前，等待的时间，单位秒。如果没有设定该值，默认会参照Type.suspend。"
+    suspend: Float @query @upsert
+    "任务启动后，延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照Type.delay。"
     delay: Float @query @upsert
     """
     任务启动时，默认延迟执行的时间的随机抖动系数。

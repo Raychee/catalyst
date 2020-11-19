@@ -266,7 +266,29 @@ describe('Scheduler', () => {
 
     });
 
+
     test('schedule jobs', async () => {
+        await operations.ensureDomain('domain');
+        await operations.ensureType('domain', 'type');
+        await operations.updateDomains({domain: 'domain'}, {suspend: 2});
+
+        let t1 = await operations.insertTask({
+            domain: 'domain', type: 'type', mode: 'ONCE'
+        });
+        let j1 = await operations.insertJob({task: t1._id});
+        expect(j1.status).toBe( 'SUSPENDED');
+        expect(j1.timeCreated.getTime()).toBe( j1.timePending.getTime() - 2000);
+        
+        const scheduler = new Scheduler(
+            new Logger('Scheduler'), operations, {}, {heartbeat: 0.1, heartAttack: 1}
+        );
+        await scheduler.scheduleJobsManager.run();
+        expect(await operations.jobs.findOne()).toMatchObject(j1);
+        await sleep(2000);
+        expect(await operations.jobs.findOne()).toMatchObject({...j1, status: 'PENDING'});
+    });
+
+    test('spawn jobs', async () => {
         await operations.ensureDomain('domain');
         await operations.ensureType('domain', 'type');
         await operations.updateDomains({domain: 'domain'}, {retry: 3});
