@@ -1,3 +1,5 @@
+"use strict";
+
 const {describe, beforeAll, beforeEach, afterAll, test, expect} = require('@jest/globals');
 
 const {MongoClient} = require('mongodb');
