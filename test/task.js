@@ -71,7 +71,7 @@ describe('Job', () => {
         });
         const jobConfig = await operations.insertJob({task: taskConfig._id});
 
-        expect(jobConfig.params.schedule.time).toBe(jobConfig.timeCreated.toISOString());
+        expect(jobConfig.params.schedule.time.getTime()).toBe(jobConfig.timeCreated.getTime());
         expect(jobConfig.params.schedule.taskId).toBe(taskConfig._id.toString());
         expect(jobConfig.retry).toBe(2);
 
