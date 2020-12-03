@@ -18,5 +18,9 @@ module.exports = {
     startServer(options) {
         const server = new Server(options);
         return server.start({waitForStop: true}).catch(e => console.error(e));
-    }
+    },
+    startDebugger(options) {
+        const debugger_ = new Debugger(options);
+        return debugger_.start({waitForStop: true}).catch(e => console.error(e));
+    },
 };
