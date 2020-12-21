@@ -217,30 +217,30 @@ enum TaskMode {
 "任务实例，指特定的一次任务的执行"
 type Job {
     "任务实例全局唯一id"
-    id: ID! @query @upsert
+    id: ID! @query @upsert(required: true)
     "任务业务域"
-    domain: String! @query @upsert
+    domain: String! @query
     "任务类型，决定了任务的执行逻辑"
-    type: String! @query @upsert
+    type: String! @query
     "任务参数，具体有哪些参数跟任务类型有关"
     params: JSONObject @query @upsert
     "任务上下文"
-    context: JSONObject @query @upsert
+    context: JSONObject @query
     "任务实例的优先级"
     priority: Int @query @upsert
     "在指定时间范围内对任务实例去重，单位秒。重复任务实例指的是同一个类型、参数完全相同的任务实例。"
-    dedupWithin: Int @query @upsert
+    dedupWithin: Int @query
     "对任务实例去重的目标个数，即去重后保留的真正执行的任务数，一般情况下为1。该参数仅在dedupWithin >= 0时有效。"
-    dedupLimit: Int @query @upsert
+    dedupLimit: Int @query
     """
     任务实例去重时，取消的是前一个(false)任务还是后一个(true，默认)。若取消前一个任务，且前一个任务已被执行，那么去重等价于无效操作。
     重复任务实例指的是同一个类型、参数完全相同的任务实例。
     """
-    dedupRecent: Boolean @query @upsert
+    dedupRecent: Boolean @query
     "任务实例默认最大执行时长，单位秒。如果超时则会分配资源重新运行该任务。"
     timeout: Int @query @upsert
     "任务启动前，等待的时间，单位秒。如果没有设定该值，默认会参照Type.suspend。"
-    suspend: Float @query @upsert
+    suspend: Float @query
     "任务启动后，延迟执行的时间间隔，单位秒。如果没有设定该值，默认会参照Type.delay。"
     delay: Float @query @upsert
     """

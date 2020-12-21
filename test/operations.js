@@ -142,40 +142,45 @@ describe('Operations', () => {
 
     describe('insert a valid task', () => {
         test('', async () => {
+            const now = new Date();
             taskBx = await operations.insertTask({
                 domain: 'B', type: 'x', subTasks: [{domain: 'A', type: 'b', retry: 9}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
-                params: {p1: 123, testNullValue: null, intv: '${task.interval}'}, suspend: 2,
+                params: {testNullValue: null, intv: '${task.interval}', t: '${timeScheduled}'}, suspend: 2,
             });
-            const {ctime: c1, mtime: m1, _id: i1, local: l1, ...t1} = taskBx;
+            const {ctime: c1, mtime: m1, _id: i1, local: l1, nextTime: tn1, ...t1} = taskBx;
             expect(t1).toStrictEqual({
                 domain: 'B', type: 'x', 
                 subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}, {domain: '*', type: 'c', delay: 40}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
-                enabled: true, params: {p1: 123, testNullValue: null, intv: '${task.interval}'}, context: {},
+                enabled: true, params: {testNullValue: null, intv: '${task.interval}', t: '${timeScheduled}'}, context: {},
                 timeout: -1, suspend: 2, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
-                nextTime: new Date(0),
+                lastTime: null,
             });
+            expect(Math.abs(c1 - now)).toBeLessThanOrEqual(1000);
+            expect(tn1.getTime()).toBeGreaterThanOrEqual(c1.getTime());
             expect(i1).toBeTruthy();
             expect(l1).toBeUndefined();
             taskBx = await operations.tasks.findOne({_id: taskBx._id});
-            const {ctime: c2, mtime: m2, _id: i2, ...t2} = taskBx;
+            const {ctime: c2, mtime: m2, _id: i2, nextTime: tn21, local: {nextTime: tn22, ...l2}, ...t2} = taskBx;
             expect(t2).toStrictEqual({
                 domain: 'B', type: 'x', 
                 subTasks: [{domain: 'A', type: 'b', delay: 30, retry: 9}, {domain: '*', type: 'c', delay: 40}],
                 retry: 8, validBefore: new Date('2019-01-01'), mode: 'REPEATED', interval: 30,
-                enabled: true, params: {p1: 123, testNullValue: null, intv: '${task.interval}'}, context: {},
+                enabled: true, params: {testNullValue: null, intv: '${task.interval}', t: '${timeScheduled}'}, context: {},
                 timeout: -1, suspend: 2, delay: 2, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
-                nextTime: new Date(0),
-                local: {
-                    domain: 'B', type: 'x',
-                    enabled: true, params: {p1: 123, testNullValue: null, intv: '${task.interval}'}, context: {}, validBefore: new Date('2019-01-01'),
-                    subTasks: [{domain: 'A', type: 'b', retry: 9}], 
-                    mode: 'REPEATED', interval: 30, retry: 8, suspend: 2, nextTime: new Date(0),
-                }
+                lastTime: null,
             });
+            expect(l2).toStrictEqual({
+                domain: 'B', type: 'x',
+                enabled: true, params: {testNullValue: null, intv: '${task.interval}', t: '${timeScheduled}'}, context: {}, validBefore: new Date('2019-01-01'),
+                subTasks: [{domain: 'A', type: 'b', retry: 9}],
+                mode: 'REPEATED', interval: 30, retry: 8, suspend: 2, lastTime: null,
+            });
+            expect(tn21.getTime()).toBe(tn1.getTime());
+            expect(tn22.getTime()).toBe(tn1.getTime());
         });
     });
 
@@ -186,7 +191,7 @@ describe('Operations', () => {
             const {_id: i1, timeCreated: t1, timeScheduled: ts1, timePending: tp1, local: l1, ...j1} = job;
             expect(j1).toStrictEqual({
                 domain: 'B', type: 'x', suspend: 2, delay: 2, 
-                params: {p1: 123, testNullValue: null, intv: 30}, context: {}, trials: [], status: 'SUSPENDED',
+                params: {testNullValue: null, intv: 30, t: ts1}, context: {}, trials: [], status: 'SUSPENDED',
                 task: taskBx._id, retry: 8, timeout: -1, delayRandomize: 0, retryDelayFactor: 1,
                 priority: 0, dedupWithin: -1, dedupLimit: 1, dedupRecent: true,
             });
@@ -307,21 +312,23 @@ describe('Operations', () => {
 
     describe('update a task with non-null values', () => {
         test('', async () => {
+            const now = new Date();
             await operations.updateTasks(
                 {_id: taskBx._id}, 
-                {params: {intv: '${task.interval / 2}'}, delay: 21, mode: 'REPEATED', interval: 50}
+                {params: {intv: '${task.interval / 2}', t: '${timeScheduled}'}, delay: 21, mode: 'REPEATED', interval: 50}
             );
             let task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c1, mtime: m1, _id: i1, nextTime: n1, ...t1} = task;
             const {ctime: c8, mtime: m8, _id: i8, nextTime: n8, ...t8} = taskBx;
             expect(t1).toStrictEqual({
-                ...t8, delay: 21, interval: 50, params: {intv: '${task.interval / 2}'},
-                local: {...t8.local, delay: 21, interval: 50, params: {intv: '${task.interval / 2}'}}
+                ...t8, delay: 21, interval: 50, params: {intv: '${task.interval / 2}', t: '${timeScheduled}'},
+                local: {...t8.local, delay: 21, interval: 50, params: {intv: '${task.interval / 2}', t: '${timeScheduled}'}},
             });
             expect(m1.getTime()).toBeGreaterThanOrEqual(m8.getTime());
             expect(c1.getTime()).toBe(c8.getTime());
             expect(i1).toEqual(i8);
-            expect(n1.getTime()).toBe(0);
+            expect(n1.getTime()).toBeGreaterThanOrEqual(c1.getTime());
+            expect(n1 - now).toBeLessThanOrEqual(50000);
 
             taskBx = task;
 
@@ -346,9 +353,9 @@ describe('Operations', () => {
             taskBx = task;
 
             let job = await operations.jobs.findOne({_id: jobBx._id});
-            const {_id: i2, timeCreated: t21, local: {timeCreated: t22, ...l2}, ...j2} = job;
-            const {_id: i3, timeCreated: t31, local: {timeCreated: t32, ...l3}, ...j3} = jobBx;
-            expect(j2).toStrictEqual({...j3, params: {intv: 25}});
+            const {_id: i2, timeCreated: t21, timeScheduled: ts2, local: {timeCreated: t22, ...l2}, ...j2} = job;
+            const {_id: i3, timeCreated: t31, timeScheduled: ts3, local: {timeCreated: t32, ...l3}, ...j3} = jobBx;
+            expect(j2).toStrictEqual({...j3, params: {intv: 25, t: ts2}});
             expect(l2).toStrictEqual(l3);
 
             jobBx = job;
@@ -609,7 +616,10 @@ describe('Operations', () => {
             let task = await operations.tasks.findOne({_id: taskBx._id});
             const {ctime: c1, mtime: m1, _id: i1, ...t1} = task;
             const {ctime: c8, mtime: m8, _id: i8, ...t8} = taskBx;
-            expect(t1).toStrictEqual({...t8, enabled: false, local: {...t8.local, enabled: false}});
+            expect(t1).toStrictEqual({
+                ...t8, enabled: false, nextTime: null, 
+                local: {...t8.local, enabled: false, nextTime: null}
+            });
             expect(m1.getTime()).toBeGreaterThanOrEqual(m8.getTime());
             expect(c1.getTime()).toBe(c8.getTime());
             expect(i1).toEqual(i8);
@@ -636,11 +646,16 @@ describe('Operations', () => {
 
     describe('re-enable a task', () => {
         test('', async () => {
+            const now = new Date();
             await operations.updateTasks({_id: taskBx._id}, {enabled: true});
             let task = await operations.tasks.findOne({_id: taskBx._id});
-            const {ctime: c1, mtime: m1, _id: i1, ...t1} = task;
-            const {ctime: c8, mtime: m8, _id: i8, ...t8} = taskBx;
-            expect(t1).toStrictEqual({...t8, enabled: true, local: {...t8.local, enabled: true}});
+            const {ctime: c1, mtime: m1, _id: i1, nextTime: tn1, ...t1} = task;
+            const {ctime: c8, mtime: m8, _id: i8, nextTime: tn8, ...t8} = taskBx;
+            expect(t1).toStrictEqual({
+                ...t8, enabled: true,
+                local: {...t8.local, enabled: true, nextTime: tn1}
+            });
+            expect(tn1.getTime()).toBeGreaterThanOrEqual(c1.getTime());
             expect(m1.getTime()).toBeGreaterThanOrEqual(m8.getTime());
             expect(c1.getTime()).toBe(c8.getTime());
             expect(i1).toEqual(i8);
