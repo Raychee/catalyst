@@ -1,6 +1,6 @@
 {
   "name": "@raychee/catalyst",
-  "version": "0.4.125",
+  "version": "0.4.126",
   "description": "",
   "main": "index.js",
   "repository": {
@@ -16,7 +16,7 @@
   "homepage": "https://github.com/Raychee/catalyst#readme",
   "dependencies": {
     "@koa/cors": "^3.0.0",
-    "@raychee/utils": "^0.2.29",
+    "@raychee/utils": "^0.2.32",
     "apollo-server-koa": "^2.7.0",
     "cron": "^1.7.2",
     "debug": "^4.1.1",
